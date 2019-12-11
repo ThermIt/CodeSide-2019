@@ -1,13 +1,12 @@
-import java.io.BufferedInputStream;
-import java.io.IOException;
-import java.io.OutputStream;
-import java.net.Socket;
-import java.io.InputStream;
-import java.util.Map;
-import java.util.HashMap;
-import java.io.BufferedOutputStream;
-
+import older.MyOlderStrategy;
+import util.Debug;
+import util.Strategy;
 import util.StreamUtil;
+
+import java.io.*;
+import java.net.Socket;
+import java.util.HashMap;
+import java.util.Map;
 
 public class Runner {
     private final InputStream inputStream;
@@ -22,8 +21,36 @@ public class Runner {
         outputStream.flush();
     }
 
+    private static void runOnce(String host, int port, String token, boolean older) {
+        Runnable task = () -> {
+            try {
+                new Runner(host, port, token).run(older);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        };
+        Thread thread = new Thread(task);
+        thread.start();
+    }
+
+    public static void main(String[] args) throws IOException {
+        String host = args.length < 1 ? "127.0.0.1" : args[0];
+        int port = args.length < 2 ? 31001 : Integer.parseInt(args[1]);
+        String token = args.length < 3 ? "0000000000000000" : args[2];
+        if (args.length > 3 && "double".equals(args[3])) {
+            runOnce(host, port, token, false);
+            runOnce(host, port + 1, token, true);
+        } else  {
+            new Runner(host, port, token).run();
+        }
+    }
+
     void run() throws IOException {
-        MyStrategy myStrategy = new MyStrategy();
+        run(false);
+    }
+
+    void run(boolean older) throws IOException {
+        Strategy myStrategy = older ? new MyOlderStrategy() : new MyStrategy();
         Debug debug = new Debug(outputStream);
         while (true) {
             model.ServerMessageGame message = model.ServerMessageGame.readFrom(inputStream);
@@ -40,12 +67,5 @@ public class Runner {
             new model.PlayerMessageGame.ActionMessage(new model.Versioned(actions)).writeTo(outputStream);
             outputStream.flush();
         }
-    }
-
-    public static void main(String[] args) throws IOException {
-        String host = args.length < 1 ? "127.0.0.1" : args[0];
-        int port = args.length < 2 ? 31001 : Integer.parseInt(args[1]);
-        String token = args.length < 3 ? "0000000000000000" : args[2];
-        new Runner(host, port, token).run();
     }
 }

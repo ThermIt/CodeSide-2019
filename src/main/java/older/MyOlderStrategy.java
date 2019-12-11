@@ -1,9 +1,11 @@
+package older;
+
 import model.*;
 import util.Debug;
 import util.Strategy;
 import util.VectorUtils;
 
-public class MyStrategy implements Strategy {
+public class MyOlderStrategy implements Strategy {
 
     VectorUtils vecUtil = new VectorUtils();
     private Unit unit;
@@ -16,11 +18,6 @@ public class MyStrategy implements Strategy {
 
     @Override
     public UnitAction getAction(Unit unit, Game game, Debug debug) {
-        // TODO: 1. предсказание положения противника
-        // TODO: 2. уворачивание от пуль
-        // TODO: 3. поиск пути
-
-
         this.unit = unit;
         this.game = game;
         this.debug = debug;
@@ -87,10 +84,9 @@ public class MyStrategy implements Strategy {
         }
         action.setSwapWeapon(false);
         action.setPlantMine(false);
-
-
         return action;
     }
+
 
     private boolean isInSight(Unit unit, Game game, Vec2Double aim) {
         Vec2Double vector = vecUtil.normalize(aim, 0.05);

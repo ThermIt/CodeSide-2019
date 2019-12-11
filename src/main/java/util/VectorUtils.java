@@ -1,3 +1,5 @@
+package util;
+
 import model.Unit;
 import model.Vec2Double;
 import model.Vec2Float;
