@@ -50,22 +50,28 @@ public class Runner {
     }
 
     void run(boolean older) throws IOException {
-        Strategy myStrategy = older ? new MyOlderStrategy() : new MyStrategy();
-        Debug debug = new Debug(outputStream);
-        while (true) {
-            model.ServerMessageGame message = model.ServerMessageGame.readFrom(inputStream);
-            model.PlayerView playerView = message.getPlayerView();
-            if (playerView == null) {
-                break;
-            }
-            Map<Integer, model.UnitAction> actions = new HashMap<>();
-            for (model.Unit unit : playerView.getGame().getUnits()) {
-                if (unit.getPlayerId() == playerView.getMyId()) {
-                    actions.put(unit.getId(), myStrategy.getAction(unit, playerView.getGame(), debug));
+        try {
+            Strategy myStrategy = older ? new MyOlderStrategy() : new MyStrategy();
+            Debug debug = new Debug(outputStream);
+            while (true) {
+                model.ServerMessageGame message = model.ServerMessageGame.readFrom(inputStream);
+                model.PlayerView playerView = message.getPlayerView();
+                if (playerView == null) {
+                    break;
                 }
+                Map<Integer, model.UnitAction> actions = new HashMap<>();
+                for (model.Unit unit : playerView.getGame().getUnits()) {
+                    if (unit.getPlayerId() == playerView.getMyId()) {
+                        actions.put(unit.getId(), myStrategy.getAction(unit, playerView.getGame(), debug));
+                    }
+                }
+                new model.PlayerMessageGame.ActionMessage(new model.Versioned(actions)).writeTo(outputStream);
+                outputStream.flush();
             }
-            new model.PlayerMessageGame.ActionMessage(new model.Versioned(actions)).writeTo(outputStream);
-            outputStream.flush();
+        } catch (IOException e) {
+            System.out.println(e.toString());
+            e.printStackTrace();
+            throw e;
         }
     }
 }
