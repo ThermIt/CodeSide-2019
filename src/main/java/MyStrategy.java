@@ -203,8 +203,8 @@ public class MyStrategy implements Strategy {
         }
 
         public void moveOneUpdate() {
-            position.setX(position.getX() + velocity.getX() / (double) game.getProperties().getUpdatesPerTick());
-            position.setY(position.getY() + velocity.getY() / (double) game.getProperties().getUpdatesPerTick());
+            position.setX(position.getX() + velocity.getX() / game.getProperties().getTicksPerSecond() / (double) game.getProperties().getUpdatesPerTick());
+            position.setY(position.getY() + velocity.getY() / game.getProperties().getTicksPerSecond() / (double) game.getProperties().getUpdatesPerTick());
         }
 
         public Vec2Double getPosition() {
