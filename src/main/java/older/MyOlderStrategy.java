@@ -95,13 +95,13 @@ public class MyOlderStrategy implements Strategy {
         for (Vec2Double location = unitCenter; distanceSqr(location, enemyCenter) > 0.1; location = vecUtil.add(location, vector)) {
 
             if (getTile(location, game) == Tile.WALL) {
-                debug.draw(new CustomData.Line(vecUtil.fromVec2Double(unitCenter), vecUtil.fromVec2Double(location),
+                debug.draw(new CustomData.Line(vecUtil.toFloatVector(unitCenter), vecUtil.toFloatVector(location),
                         0.05f, new ColorFloat(1, 0, 0, 1)));
                 return false;
             }
         }
 
-        debug.draw(new CustomData.Line(vecUtil.fromVec2Double(unitCenter), vecUtil.fromVec2Double(enemyCenter),
+        debug.draw(new CustomData.Line(vecUtil.toFloatVector(unitCenter), vecUtil.toFloatVector(enemyCenter),
                 0.05f, new ColorFloat(0, 1, 0, 1)));
         return true;
     }

@@ -4,16 +4,24 @@ import model.Unit;
 import model.Vec2Double;
 import model.Vec2Float;
 
+import static java.lang.StrictMath.PI;
+import static java.lang.StrictMath.atan2;
+
 public class VectorUtils {
-    public Vec2Float fromVec2Double(Vec2Double from) {
+
+    public Vec2Double clone(Vec2Double from) {
+        return new Vec2Double(from.getX(), from.getY());
+    }
+
+    public Vec2Float toFloatVector(Vec2Double from) {
         return new Vec2Float((float) from.getX(), (float) from.getY());
     }
 
-    public Vec2Float fromVec2Double(Vec2Double from, Vec2Double plus, float scale) {
+    public Vec2Float toFloatVector(Vec2Double from, Vec2Double plus, float scale) {
         return new Vec2Float((float) (from.getX() + plus.getX() * scale), (float) (from.getY() + plus.getY() * scale));
     }
 
-    public Vec2Float fromVec2Double(Vec2Double from, double plusX, double plusY) {
+    public Vec2Float toFloatVector(Vec2Double from, double plusX, double plusY) {
         return new Vec2Float((float) (from.getX() + plusX), (float) (from.getY() + plusY));
     }
 
@@ -48,6 +56,30 @@ public class VectorUtils {
 
     public Vec2Double getCenter(Unit unit) {
         return add(unit.getPosition(), removeX(scale(unit.getSize(), 0.5)));
+    }
+
+    public Vec2Double getCenter(Vec2Double position, Vec2Double size) {
+        return add(position, removeX(scale(size, 0.5)));
+    }
+
+    public double getAngle(Vec2Double vector) {
+        double relativeAngleTo = atan2(vector.getY(), vector.getX());
+
+        while (relativeAngleTo > PI) {
+            relativeAngleTo -= 2.0D * PI;
+        }
+
+        while (relativeAngleTo < -PI) {
+            relativeAngleTo += 2.0D * PI;
+        }
+
+        return relativeAngleTo;
+    }
+
+    public Vec2Double fromAngle(double angle, double length) {
+        double x = StrictMath.cos(angle) * length;
+        double y = StrictMath.sin(angle) * length;
+        return new Vec2Double(x, y);
     }
 
 }

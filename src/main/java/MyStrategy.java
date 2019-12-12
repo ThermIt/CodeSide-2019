@@ -3,10 +3,15 @@ import util.Debug;
 import util.Strategy;
 import util.VectorUtils;
 
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+
 public class MyStrategy implements Strategy {
 
     VectorUtils vecUtil = new VectorUtils();
     private Unit unit;
+    private Unit prevUnit;
     private Game game;
     private Debug debug;
 
@@ -21,6 +26,7 @@ public class MyStrategy implements Strategy {
         // TODO: 3. поиск пути
 
 
+        this.prevUnit = this.unit;
         this.unit = unit;
         this.game = game;
         this.debug = debug;
@@ -79,7 +85,12 @@ public class MyStrategy implements Strategy {
         action.setJump(jump);
         action.setJumpDown(!jump);
         action.setAim(aim);
-        if (isInSight(unit, game, aim)) {
+/*
+        if (isInSight(aim)) {
+            action.setShoot(true);
+        }
+*/
+        if (hitProbability(nearestEnemy) > 0.05) {
             action.setShoot(true);
         }
         if (unit.getWeapon() != null && unit.getWeapon().getMagazine() == 0) {
@@ -92,22 +103,43 @@ public class MyStrategy implements Strategy {
         return action;
     }
 
-    private boolean isInSight(Unit unit, Game game, Vec2Double aim) {
-        Vec2Double vector = vecUtil.normalize(aim, 0.05);
+    private double hitProbability(Unit enemy) {
+        if (unit.getWeapon() == null) {
+            return 0.0;
+        }
+        if ((unit.getWeapon().getFireTimer() != null && unit.getWeapon().getFireTimer() > 1.0) || unit.getWeapon().getMagazine() == 0) {
+            return 0.0;
+        }
         Vec2Double unitCenter = vecUtil.getCenter(unit);
-        Vec2Double enemyCenter = vecUtil.add(unitCenter, aim);
-        for (Vec2Double location = unitCenter; distanceSqr(location, enemyCenter) > 0.1; location = vecUtil.add(location, vector)) {
-
-            if (getTile(location, game) == Tile.WALL) {
-                debug.draw(new CustomData.Line(vecUtil.fromVec2Double(unitCenter), vecUtil.fromVec2Double(location),
-                        0.05f, new ColorFloat(1, 0, 0, 1)));
-                return false;
+        int hitCount = 0;
+        int maxHitCount = 51;
+        List<DummyBullet> bullets = new ArrayList<>();
+        Vec2Double direction = vecUtil.substract(enemy.getPosition(), unit.getPosition());
+        double baseAngle = vecUtil.getAngle(direction);
+        int maxSpread = (maxHitCount - 1) / 2;
+        for (int i = -maxSpread; i <= maxSpread; i++) {
+            Vec2Double adjustedDirection = vecUtil.fromAngle(baseAngle + i / (double) maxSpread * unit.getWeapon().getSpread(), 10.0);
+            DummyBullet dummyBullet = new DummyBullet(unit.getWeapon().getParams().getBullet(), unitCenter, adjustedDirection);
+            bullets.add(dummyBullet);
+        }
+        Dummy enemyDummy = new Dummy(enemy);
+        while (bullets.size() > 0) {
+            for (Iterator<DummyBullet> iterator = bullets.iterator(); iterator.hasNext(); ) {
+                DummyBullet bullet = iterator.next();
+                bullet.moveOneUpdate();
+                if (bullet.isHittingTheDummy(enemyDummy)) {
+                    debug.draw(new CustomData.Line(vecUtil.toFloatVector(unitCenter), vecUtil.toFloatVector(bullet.position),
+                            0.05f, new ColorFloat(0, 1, 0, 1)));
+                    iterator.remove();
+                    hitCount++;
+                } else if (bullet.isHittingAWall()) {
+                    debug.draw(new CustomData.Line(vecUtil.toFloatVector(unitCenter), vecUtil.toFloatVector(bullet.position),
+                            0.05f, new ColorFloat(1, 0, 0, 1)));
+                    iterator.remove();
+                }
             }
         }
-
-        debug.draw(new CustomData.Line(vecUtil.fromVec2Double(unitCenter), vecUtil.fromVec2Double(enemyCenter),
-                0.05f, new ColorFloat(0, 1, 0, 1)));
-        return true;
+        return hitCount / (double) maxHitCount;
     }
 
     private Tile getTile(Vec2Double location, Game game) {
@@ -151,5 +183,73 @@ public class MyStrategy implements Strategy {
             }
         }
         return nearestEnemy;
+    }
+
+    class DummyBullet {
+        private Vec2Double velocity;
+        private Vec2Double position;
+        private double size;
+
+        public DummyBullet(Bullet bullet) {
+            this.position = vecUtil.clone(bullet.getPosition());
+            this.velocity = vecUtil.clone(bullet.getVelocity());
+            this.size = bullet.getSize();
+        }
+
+        public DummyBullet(BulletParams bulletParams, Vec2Double position, Vec2Double direction) {
+            this.position = vecUtil.clone(position);
+            this.velocity = vecUtil.normalize(direction, bulletParams.getSpeed());
+            this.size = bulletParams.getSize();
+        }
+
+        public void moveOneUpdate() {
+            position.setX(position.getX() + velocity.getX() / (double) game.getProperties().getUpdatesPerTick());
+            position.setY(position.getY() + velocity.getY() / (double) game.getProperties().getUpdatesPerTick());
+        }
+
+        public Vec2Double getPosition() {
+            return position;
+        }
+
+        public boolean isHittingAWall() {
+            int xMinusSize = (int) Math.floor(position.getX() - size / 2.0);
+            int xPlusSize = (int) Math.floor(position.getX() + size / 2.0);
+            int yMinusSize = (int) Math.floor(position.getY() - size / 2.0);
+            int yPlusSize = (int) Math.floor(position.getY() + size / 2.0);
+            Tile tile1 = game.getLevel().getTiles()[xMinusSize][yMinusSize];
+            Tile tile2 = game.getLevel().getTiles()[xPlusSize][yMinusSize];
+            Tile tile3 = game.getLevel().getTiles()[xMinusSize][yPlusSize];
+            Tile tile4 = game.getLevel().getTiles()[xPlusSize][yPlusSize];
+            return tile1 == Tile.WALL || tile2 == Tile.WALL || tile3 == Tile.WALL || tile4 == Tile.WALL;
+        }
+
+        public boolean isHittingTheDummy(Dummy dummy) {
+            Vec2Double dummyCenter = vecUtil.getCenter(dummy.getPosition(), dummy.unit.getSize());
+            boolean hit = Math.abs(dummyCenter.getX() - position.getX()) <= (dummy.unit.getSize().getX() + size) / 2.0
+                    && Math.abs(dummyCenter.getY() - position.getY()) <= (dummy.unit.getSize().getY() + size) / 2.0;
+
+            return hit;
+        }
+    }
+
+    class Dummy {
+        private Vec2Double position;
+        private Unit unit;
+
+        public Dummy(Unit unit) {
+            this.position = vecUtil.clone(unit.getPosition());
+            this.unit = unit;
+        }
+
+        public void move(UnitAction action) {
+            JumpState jumpState = unit.getJumpState();
+            boolean onGround = unit.isOnGround();
+            boolean onLadder = unit.isOnLadder();
+//            unit.getWeapon().re
+        }
+
+        public Vec2Double getPosition() {
+            return position;
+        }
     }
 }
