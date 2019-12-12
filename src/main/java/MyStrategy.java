@@ -84,7 +84,7 @@ public class MyStrategy implements Strategy {
         action.setVelocity(Math.signum(runningPos.getX() - unit.getPosition().getX()) * game.getProperties().getUnitMaxHorizontalSpeed());
         action.setJump(jump);
         action.setJumpDown(!jump);
-        action.setAim(aim);
+        action.setAim(vecUtil.normalize(aim, 1.0));
 /*
         if (isInSight(aim)) {
             action.setShoot(true);
