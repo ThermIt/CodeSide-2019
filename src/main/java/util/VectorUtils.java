@@ -47,6 +47,9 @@ public class VectorUtils {
 
     public Vec2Double normalize(Vec2Double vector, double newLength) {
         double length = length(vector);
+        if (length == 0) {
+            return vector;
+        }
         return new Vec2Double(vector.getX() / length * newLength, vector.getY() / length * newLength);
     }
 
