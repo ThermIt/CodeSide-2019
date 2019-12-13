@@ -57,6 +57,12 @@ public class VectorUtils {
         return Math.sqrt(vector.getX() * vector.getX() + vector.getY() * vector.getY());
     }
 
+    public double length(Vec2Double vector1, Vec2Double vector2) {
+        double x = vector1.getX() - vector2.getX();
+        double y = vector1.getY() - vector2.getY();
+        return Math.sqrt(x * x + y * y);
+    }
+
     public Vec2Double getCenter(Unit unit) {
         return add(unit.getPosition(), removeX(scale(unit.getSize(), 0.5)));
     }
