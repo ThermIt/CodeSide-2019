@@ -11,6 +11,7 @@ public class MyStrategy implements Strategy {
 
     public static final double HEALTH_TO_LOOK_FOR_HEAL = 0.90;
     private static final double EPSILON = 0.000000000001;
+    private static final float OLD_DEBUG_TRANSPARENT = 0.1f;
     VectorUtils vecUtil = new VectorUtils();
     private Unit unit;
     private Unit prevUnit;
@@ -25,11 +26,11 @@ public class MyStrategy implements Strategy {
 
     @Override
     public UnitAction getAction(Unit unit, Game game, Debug debug) {
-        // TODO: 1. предсказание положения противника
         // TODO: 2. уворачивание от пуль
         // TODO: 3. поиск пути
         // TODO: 4. минимальный aim
-
+        // TODO: 5. вероятность подстрелить себя ракетой
+        // TODO: 6. отстрел мин
 
         this.prevUnit = this.unit;
         this.unit = unit;
@@ -37,25 +38,6 @@ public class MyStrategy implements Strategy {
         this.updatesPerSecond = game.getProperties().getTicksPerSecond() * (double) game.getProperties().getUpdatesPerTick();
         this.halfUnitSizeX = game.getProperties().getUnitSize().getX() / 2.0;
         this.debug = debug;
-/*        Tile[][] tiles = game.getLevel().getTiles();
-        for (int i = 0; i < tiles.length; i++) {
-            for (int j = 0; j < tiles[i].length; j++) {
-                ColoredVertex[] vertices = new ColoredVertex[4];
-                vertices[0] = new ColoredVertex(new Vec2Float(i, j), new ColorFloat(1, 0, 0, 1));
-                vertices[1] = new ColoredVertex(new Vec2Float(i + 0.5f, j), new ColorFloat(0, 1, 0, 1));
-                vertices[2] = new ColoredVertex(new Vec2Float(i + 0.5f, j + 0.5f), new ColorFloat(1, 0, 0, 1));
-                vertices[3] = new ColoredVertex(new Vec2Float(i, j + 0.5f), new ColorFloat(0, 0, 1, 1));
-                debug.draw(new CustomData.Polygon(vertices));
-                debug.draw(new CustomData.PlacedText(tiles[i][j].toString() + " " + i + " " + j, new Vec2Float(i, j), TextAlignment.CENTER, 10, new ColorFloat(1, 1, 1, 1)));
-            }
-        }
-        ColoredVertex[] vertices = new ColoredVertex[4];
-        vertices[0] = new ColoredVertex(vecUtil.fromVec2Double(unit.getPosition()), new ColorFloat(1, 0, 0, 1));
-        vertices[1] = new ColoredVertex(vecUtil.fromVec2Double(unit.getPosition(), halfUnitSizeX, 0.0), new ColorFloat(0, 1, 0, 1));
-        vertices[2] = new ColoredVertex(vecUtil.fromVec2Double(unit.getPosition(), halfUnitSizeX, unit.getSize().getY() / 2.0), new ColorFloat(1, 0, 0, 1));
-        vertices[3] = new ColoredVertex(vecUtil.fromVec2Double(unit.getPosition(), 0.0, unit.getSize().getY() / 2.0), new ColorFloat(0, 0, 1, 1));
-        debug.draw(new CustomData.Polygon(vertices));*/
-
 
         Unit nearestEnemy = getNearestEnemy(unit, game);
         LootBox nearestWeapon = getNearestWeapon(unit, game);
@@ -91,16 +73,7 @@ public class MyStrategy implements Strategy {
             jump = true;
         }
 
-        // hack jumppad
-        Vec2Double left10 = vecUtil.add(runningPos, new Vec2Double(-1.0, 0.0));
-        Vec2Double left05 = vecUtil.add(runningPos, new Vec2Double(-0.5, 0.0));
-        Vec2Double right10 = vecUtil.add(runningPos, new Vec2Double(1.0, 0.0));
-        Vec2Double right05 = vecUtil.add(runningPos, new Vec2Double(0.5, 0.0));
-        if (getTile(left10) == Tile.JUMP_PAD) {
-            runningPos = right05;
-        } else if (getTile(right10) == Tile.JUMP_PAD) {
-            runningPos = left05;
-        }
+        runningPos = jumpPadHack(runningPos);
 
         UnitAction action = new UnitAction();
         action.setVelocity(Math.signum(runningPos.getX() - unit.getPosition().getX()) * game.getProperties().getUnitMaxHorizontalSpeed());
@@ -111,17 +84,12 @@ public class MyStrategy implements Strategy {
         if (unit.getWeapon() != null) {
             hitPOld = hitProbability(nearestEnemy, vecUtil.fromAngle(unit.getWeapon().getLastAngle(), 10.0));
         }
-        if (hitPNew >= hitPOld || unit.getWeapon() == null) {
-            action.setAim(vecUtil.normalize(aim, 1.0));
+        if (hitPNew - hitPOld >= 0.02 || unit.getWeapon() == null) {
+            action.setAim(vecUtil.normalize(aim, 10.0));
         } else {
             hitPNew = hitPOld;
             action.setAim(vecUtil.fromAngle(unit.getWeapon().getLastAngle(), 10.0));
         }
-/*
-        if (isInSight(aim)) {
-            action.setShoot(true);
-        }
-*/
         if (unit.getWeapon() != null && unit.getWeapon().getTyp() == WeaponType.ROCKET_LAUNCHER) {
             if (hitPNew > 0.3) {
                 action.setShoot(true);
@@ -138,6 +106,19 @@ public class MyStrategy implements Strategy {
         action.setPlantMine(nearestEnemy != null && vecUtil.length(vecUtil.substract(nearestEnemy.getPosition(), unit.getPosition())) < game.getProperties().getMineExplosionParams().getRadius());
 
         return action;
+    }
+
+    private Vec2Double jumpPadHack(Vec2Double runningPos) {
+        Vec2Double left10 = vecUtil.add(runningPos, new Vec2Double(-1.0, 0.0));
+        Vec2Double left05 = vecUtil.add(runningPos, new Vec2Double(-0.5, 0.0));
+        Vec2Double right10 = vecUtil.add(runningPos, new Vec2Double(1.0, 0.0));
+        Vec2Double right05 = vecUtil.add(runningPos, new Vec2Double(0.5, 0.0));
+        if (getTile(left10) == Tile.JUMP_PAD) {
+            runningPos = right05;
+        } else if (getTile(right10) == Tile.JUMP_PAD) {
+            runningPos = left05;
+        }
+        return runningPos;
     }
 
     private Vec2Double findMeanAim(Unit enemy) {
@@ -168,13 +149,13 @@ public class MyStrategy implements Strategy {
                 bullet.moveOneUpdate();
                 if (bullet.isHittingTheDummy(enemyDummy)) {
                     debug.draw(new CustomData.Line(vecUtil.toFloatVector(unitCenter), vecUtil.toFloatVector(bullet.position),
-                            0.05f, new ColorFloat(0, 1, 1, 0.3f)));
+                            0.05f, new ColorFloat(0, 1, 1, 0.1f)));
                     iterator.remove();
                     hitCount++;
                     hitVector = vecUtil.add(bullet.position, hitVector);
                 } else if (bullet.isHittingAWall()) {
                     debug.draw(new CustomData.Line(vecUtil.toFloatVector(unitCenter), vecUtil.toFloatVector(bullet.position),
-                            0.05f, new ColorFloat(1, 0, 1, 0.3f)));
+                            0.05f, new ColorFloat(1, 0, 1, OLD_DEBUG_TRANSPARENT)));
                     iterator.remove();
                 }
             }
@@ -212,12 +193,12 @@ public class MyStrategy implements Strategy {
                 bullet.moveOneUpdate();
                 if (bullet.isHittingTheDummy(enemyDummy)) {
                     debug.draw(new CustomData.Line(vecUtil.toFloatVector(unitCenter), vecUtil.toFloatVector(bullet.position),
-                            0.05f, new ColorFloat(0, 1, 0, 1)));
+                            0.05f, new ColorFloat(0, 1, 0, OLD_DEBUG_TRANSPARENT)));
                     iterator.remove();
                     hitCount++;
                 } else if (bullet.isHittingAWall()) {
                     debug.draw(new CustomData.Line(vecUtil.toFloatVector(unitCenter), vecUtil.toFloatVector(bullet.position),
-                            0.05f, new ColorFloat(1, 0, 0, 1)));
+                            0.05f, new ColorFloat(1, 0, 0, OLD_DEBUG_TRANSPARENT)));
                     iterator.remove();
                 }
             }

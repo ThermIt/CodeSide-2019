@@ -10,7 +10,6 @@ public class MySmartGuy implements Strategy {
     VectorUtils vecUtil = new VectorUtils();
     private Unit unit;
     private Game game;
-    private Debug debug;
 
     static double distanceSqr(Vec2Double a, Vec2Double b) {
         return (a.getX() - b.getX()) * (a.getX() - b.getX()) + (a.getY() - b.getY()) * (a.getY() - b.getY());
@@ -20,26 +19,6 @@ public class MySmartGuy implements Strategy {
     public UnitAction getAction(Unit unit, Game game, Debug debug) {
         this.unit = unit;
         this.game = game;
-        this.debug = debug;
-/*        Tile[][] tiles = game.getLevel().getTiles();
-        for (int i = 0; i < tiles.length; i++) {
-            for (int j = 0; j < tiles[i].length; j++) {
-                ColoredVertex[] vertices = new ColoredVertex[4];
-                vertices[0] = new ColoredVertex(new Vec2Float(i, j), new ColorFloat(1, 0, 0, 1));
-                vertices[1] = new ColoredVertex(new Vec2Float(i + 0.5f, j), new ColorFloat(0, 1, 0, 1));
-                vertices[2] = new ColoredVertex(new Vec2Float(i + 0.5f, j + 0.5f), new ColorFloat(1, 0, 0, 1));
-                vertices[3] = new ColoredVertex(new Vec2Float(i, j + 0.5f), new ColorFloat(0, 0, 1, 1));
-                debug.draw(new CustomData.Polygon(vertices));
-                debug.draw(new CustomData.PlacedText(tiles[i][j].toString() + " " + i + " " + j, new Vec2Float(i, j), TextAlignment.CENTER, 10, new ColorFloat(1, 1, 1, 1)));
-            }
-        }
-        ColoredVertex[] vertices = new ColoredVertex[4];
-        vertices[0] = new ColoredVertex(vecUtil.fromVec2Double(unit.getPosition()), new ColorFloat(1, 0, 0, 1));
-        vertices[1] = new ColoredVertex(vecUtil.fromVec2Double(unit.getPosition(), unit.getSize().getX() / 2.0, 0.0), new ColorFloat(0, 1, 0, 1));
-        vertices[2] = new ColoredVertex(vecUtil.fromVec2Double(unit.getPosition(), unit.getSize().getX() / 2.0, unit.getSize().getY() / 2.0), new ColorFloat(1, 0, 0, 1));
-        vertices[3] = new ColoredVertex(vecUtil.fromVec2Double(unit.getPosition(), 0.0, unit.getSize().getY() / 2.0), new ColorFloat(0, 0, 1, 1));
-        debug.draw(new CustomData.Polygon(vertices));*/
-
 
         Unit nearestEnemy = getNearestEnemy(unit, game);
         LootBox nearestWeapon = getNearestWeapon(unit, game);
@@ -95,14 +74,10 @@ public class MySmartGuy implements Strategy {
         for (Vec2Double location = unitCenter; distanceSqr(location, enemyCenter) > 0.1; location = vecUtil.add(location, vector)) {
 
             if (getTile(location, game) == Tile.WALL) {
-                debug.draw(new CustomData.Line(vecUtil.toFloatVector(unitCenter), vecUtil.toFloatVector(location),
-                        0.05f, new ColorFloat(1, 0, 0, 1)));
                 return false;
             }
         }
 
-        debug.draw(new CustomData.Line(vecUtil.toFloatVector(unitCenter), vecUtil.toFloatVector(enemyCenter),
-                0.05f, new ColorFloat(0, 1, 0, 1)));
         return true;
     }
 
