@@ -149,7 +149,6 @@ public class MyStrategy implements Strategy {
         }
         Vec2Double unitCenter = vecUtil.getCenter(unit);
         int hitCount = 0;
-        double hitAngle = 0.0;
         int maxHitCount = 51;
         List<DummyBullet> bullets = new ArrayList<>();
         Vec2Double direction = vecUtil.substract(enemy.getPosition(), unit.getPosition());
@@ -161,6 +160,7 @@ public class MyStrategy implements Strategy {
             bullets.add(dummyBullet);
         }
         Dummy enemyDummy = new Dummy(enemy);
+        Vec2Double hitVector = new Vec2Double(0, 0);
         while (bullets.size() > 0) {
             enemyDummy.moveOneUpdate();
             for (Iterator<DummyBullet> iterator = bullets.iterator(); iterator.hasNext(); ) {
@@ -171,7 +171,7 @@ public class MyStrategy implements Strategy {
                             0.05f, new ColorFloat(0, 1, 1, 0.3f)));
                     iterator.remove();
                     hitCount++;
-                    hitAngle += vecUtil.getAngle(bullet.velocity);
+                    hitVector = vecUtil.add(bullet.position, hitVector);
                 } else if (bullet.isHittingAWall()) {
                     debug.draw(new CustomData.Line(vecUtil.toFloatVector(unitCenter), vecUtil.toFloatVector(bullet.position),
                             0.05f, new ColorFloat(1, 0, 1, 0.3f)));
@@ -182,7 +182,7 @@ public class MyStrategy implements Strategy {
         if (hitCount == 0) {
             return new Vec2Double(0.0, 0.0);
         }
-        return vecUtil.fromAngle(hitAngle / (double) hitCount, 1.0);
+        return vecUtil.substract(vecUtil.scale(hitVector, 1.0 / (double) hitCount), unitCenter);
     }
 
     private double hitProbability(Unit enemy, Vec2Double aim) {
