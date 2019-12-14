@@ -120,6 +120,9 @@ public class MyStrategy implements Strategy {
             if (bullet.getUnitId() != unit.getId()) {
                 DummyBullet dummyBullet = new DummyBullet(bullet);
                 bullets.add(dummyBullet);
+            } else if (bullet.getExplosionParams() != null && bullet.getExplosionParams().getRadius() > 0) {
+                DummyBullet dummyBullet = new DummyBullet(bullet);
+                bullets.add(dummyBullet);
             }
         }
 
@@ -142,7 +145,7 @@ public class MyStrategy implements Strategy {
         int lastDeadTick = 0;
         List<Dummy> survivors = new ArrayList<>(dummies);
 
-        for (int i = 0; i < 20; i++) {
+        for (int i = 0; i < 33; i++) {
             for (int j = 0; j < game.getProperties().getUpdatesPerTick(); j++) {
                 for (Iterator<DummyBullet> iterator = bullets.iterator(); iterator.hasNext(); ) {
                     DummyBullet bullet = iterator.next();
@@ -161,6 +164,22 @@ public class MyStrategy implements Strategy {
                         }
                     }
                     if (bullet.isHittingAWall()) {
+                        // explosion
+                        if (bullet.getExplosionRadius() > 0.0) {
+                            for (Dummy dummy : dummies) {
+                                if (bullet.isHittingTheDummyWithExplosion(dummy)) {
+                                    dummy.catchBullet(bullet);
+                                    if (dummy.bulletCount() == 1) {
+                                        if (lastDeadTick != i) {
+                                            lastDead = new ArrayList<>();
+                                            lastDeadTick = i;
+                                        }
+                                        lastDead.add(dummy);
+                                        survivors.remove(dummy);
+                                    }
+                                }
+                            }
+                        }
                         iterator.remove();
                     }
                 }
@@ -225,7 +244,7 @@ public class MyStrategy implements Strategy {
         int maxSpread = (maxHitCount - 1) / 2;
         for (int i = -maxSpread; i <= maxSpread; i++) {
             Vec2Double adjustedDirection = vecUtil.fromAngle(baseAngle + i / (double) maxSpread * Math.PI / 3.0, 10.0);
-            DummyBullet dummyBullet = new DummyBullet(unit.getWeapon().getParams().getBullet(), unitCenter, adjustedDirection);
+            DummyBullet dummyBullet = new DummyBullet(unit.getWeapon().getParams().getBullet(), unit.getWeapon().getParams().getExplosion(), unitCenter, adjustedDirection, unit.getId());
             bullets.add(dummyBullet);
         }
         Dummy enemyDummy = new Dummy(enemy);
@@ -269,7 +288,7 @@ public class MyStrategy implements Strategy {
         int maxSpread = (maxHitCount - 1) / 2;
         for (int i = -maxSpread; i <= maxSpread; i++) {
             Vec2Double adjustedDirection = vecUtil.fromAngle(baseAngle + i / (double) maxSpread * unit.getWeapon().getSpread(), 10.0);
-            DummyBullet dummyBullet = new DummyBullet(unit.getWeapon().getParams().getBullet(), unitCenter, adjustedDirection);
+            DummyBullet dummyBullet = new DummyBullet(unit.getWeapon().getParams().getBullet(), unit.getWeapon().getParams().getExplosion(), unitCenter, adjustedDirection, unit.getId());
             bullets.add(dummyBullet);
         }
         Dummy enemyDummy = new Dummy(enemy);
@@ -433,17 +452,31 @@ public class MyStrategy implements Strategy {
         private Vec2Double velocity;
         private Vec2Double position;
         private double size;
+        private double explosionRadius = -1.0;
+        private int unitId;
 
         public DummyBullet(Bullet bullet) {
             this.position = vecUtil.clone(bullet.getPosition());
             this.velocity = vecUtil.clone(bullet.getVelocity());
             this.size = bullet.getSize();
+            if (bullet.getExplosionParams() != null) {
+                this.explosionRadius = bullet.getExplosionParams().getRadius();
+            }
+            this.unitId = bullet.getUnitId();
         }
 
-        public DummyBullet(BulletParams bulletParams, Vec2Double position, Vec2Double direction) {
+        public DummyBullet(BulletParams bulletParams, ExplosionParams explosion, Vec2Double position, Vec2Double direction, int unitId) {
             this.position = vecUtil.clone(position);
+            this.unitId = unitId;
             this.velocity = vecUtil.normalize(direction, bulletParams.getSpeed());
             this.size = bulletParams.getSize();
+            if (explosion != null) {
+                this.explosionRadius = explosion.getRadius();
+            }
+        }
+
+        public double getExplosionRadius() {
+            return explosionRadius;
         }
 
         public void moveOneUpdate() {
@@ -468,9 +501,20 @@ public class MyStrategy implements Strategy {
         }
 
         public boolean isHittingTheDummy(Dummy dummy) {
+            if (dummy.unit.getId() == unitId) {
+                return false;
+            }
             Vec2Double dummyCenter = vecUtil.getCenter(dummy.getPosition(), dummy.unit.getSize());
             boolean hit = Math.abs(dummyCenter.getX() - position.getX()) <= (dummy.unit.getSize().getX() + size) / 2.0
                     && Math.abs(dummyCenter.getY() - position.getY()) <= (dummy.unit.getSize().getY() + size) / 2.0;
+
+            return hit;
+        }
+
+        public boolean isHittingTheDummyWithExplosion(Dummy dummy) {
+            Vec2Double dummyCenter = vecUtil.getCenter(dummy.getPosition(), dummy.unit.getSize());
+            boolean hit = Math.abs(dummyCenter.getX() - position.getX()) <= (dummy.unit.getSize().getX() / 2.0 + explosionRadius)
+                    && Math.abs(dummyCenter.getY() - position.getY()) <= (dummy.unit.getSize().getY() / 2.0 + explosionRadius);
 
             return hit;
         }
@@ -527,6 +571,7 @@ public class MyStrategy implements Strategy {
                 velocity = strat.getVelocity();
                 jumpingUp = strat.isJumpUp();
                 jumpingDown = strat.isJumpDown();
+                strat.nextTick();
             }
             microTick++;
             boolean canChangeOrder = microTick == game.getProperties().getUpdatesPerTick();
@@ -573,6 +618,11 @@ public class MyStrategy implements Strategy {
             }
             if (vecUtil.length(vecUtil.substract(position, oldPosition)) > EPSILON) {
                 debug.draw(new CustomData.Line(vecUtil.toFloatVector(oldPosition), vecUtil.toFloatVector(position), 0.05f, new ColorFloat(bulletsCaught.size() / 2.0f, 0, 1, 1)));
+            }
+            if (isStandingPosition(position) && /*not jumping*/(canCancelJump || canJumpForSeconds < EPSILON)) {
+                canCancelJump = true;
+                canJumpForSeconds = game.getProperties().getUnitJumpTime();
+                jumpSpeed = game.getProperties().getUnitJumpSpeed();
             }
             if (isPositionAffectedByJumpPad(position)) {
                 canCancelJump = false;
