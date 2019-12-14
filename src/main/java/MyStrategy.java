@@ -9,14 +9,14 @@ public class MyStrategy implements Strategy {
 
     public static final double HEALTH_TO_LOOK_FOR_HEAL = 0.90;
     private static final double EPSILON = 0.000000000001;
-    private static final float OLD_DEBUG_TRANSPARENT = 0.1f;
+    private static final float OLD_DEBUG_TRANSPARENCY = 0.1f;
     VectorUtils vecUtil = new VectorUtils();
     private Unit unit;
-    private Unit prevUnit;
     private Game game;
     private Debug debug;
     private double updatesPerSecond;
     private double halfUnitSizeX;
+    private Tile[][] tiles;
 
     static double distanceSqr(Vec2Double a, Vec2Double b) {
         return (a.getX() - b.getX()) * (a.getX() - b.getX()) + (a.getY() - b.getY()) * (a.getY() - b.getY());
@@ -24,29 +24,26 @@ public class MyStrategy implements Strategy {
 
     @Override
     public UnitAction getAction(Unit unit, Game game, Debug debug) {
-        // TODO: 2. уворачивание от пуль
         // TODO: 3. поиск пути
         // TODO: 4. минимальный aim
         // TODO: 5. вероятность подстрелить себя ракетой
         // TODO: 6. отстрел мин
 
-        this.prevUnit = this.unit;
         this.unit = unit;
         this.game = game;
         this.updatesPerSecond = game.getProperties().getTicksPerSecond() * (double) game.getProperties().getUpdatesPerTick();
         this.halfUnitSizeX = game.getProperties().getUnitSize().getX() / 2.0;
         this.debug = debug;
+        this.tiles = game.getLevel().getTiles();
 
-        Unit nearestEnemy = getNearestEnemy(unit, game);
-        LootBox nearestWeapon = getNearestWeapon(unit, game);
-        Vec2Double targetPos = unit.getPosition();
+        Unit nearestEnemy = getNearestEnemy();
+        LootBox nearestWeapon = getNearestWeapon();
+        LootBox nearestMineBox = getNearestMineBox();
         Vec2Double runningPos = unit.getPosition();
         if (unit.getWeapon() == null && nearestWeapon != null) {
-            targetPos = nearestWeapon.getPosition();
-            runningPos = targetPos;
+            runningPos = nearestWeapon.getPosition();
         } else if (nearestEnemy != null) {
-            targetPos = nearestEnemy.getPosition();
-            runningPos = targetPos;
+            runningPos = nearestEnemy.getPosition();
             if (unit.getHealth() < game.getProperties().getUnitMaxHealth() * HEALTH_TO_LOOK_FOR_HEAL) {
                 LootBox nearestHealthPack = getNearestHealthPack();
                 if (nearestHealthPack != null) {
@@ -126,6 +123,11 @@ public class MyStrategy implements Strategy {
             }
         }
 
+        if (bullets.size() == 0) {
+            return;
+        }
+
+
         List<Dummy> dummies = new ArrayList<>();
         dummies.add(new Dummy(unit, new DummyStrat()));
         dummies.add(new Dummy(unit, new LeftJumpingStrat()));
@@ -174,13 +176,15 @@ public class MyStrategy implements Strategy {
             // collision imminent
             if (survivors.size() > 0) {
                 for (Dummy survivor : survivors) {
-                    if (choosenOne == null || vecUtil.length(survivor.getPosition(), runningPos) < vecUtil.length(choosenOne.getPosition(), runningPos))
+                    if (choosenOne == null || vecUtil.length(survivor.getPosition(), runningPos) < vecUtil.length(choosenOne.getPosition(), runningPos)) {
                         choosenOne = survivor;
+                    }
                 }
             } else {
                 for (Dummy survivor : lastDead) {
-                    if (choosenOne == null || vecUtil.length(survivor.getPosition(), runningPos) < vecUtil.length(choosenOne.getPosition(), runningPos))
+                    if (choosenOne == null || vecUtil.length(survivor.getPosition(), runningPos) < vecUtil.length(choosenOne.getPosition(), runningPos)) {
                         choosenOne = survivor;
+                    }
                 }
             }
 
@@ -238,7 +242,7 @@ public class MyStrategy implements Strategy {
                     hitVector = vecUtil.add(bullet.position, hitVector);
                 } else if (bullet.isHittingAWall()) {
                     debug.draw(new CustomData.Line(vecUtil.toFloatVector(unitCenter), vecUtil.toFloatVector(bullet.position),
-                            0.05f, new ColorFloat(1, 0, 1, OLD_DEBUG_TRANSPARENT)));
+                            0.05f, new ColorFloat(1, 0, 1, OLD_DEBUG_TRANSPARENCY)));
                     iterator.remove();
                 }
             }
@@ -275,12 +279,12 @@ public class MyStrategy implements Strategy {
                 bullet.moveOneUpdate();
                 if (bullet.isHittingTheDummy(enemyDummy)) {
                     debug.draw(new CustomData.Line(vecUtil.toFloatVector(unitCenter), vecUtil.toFloatVector(bullet.position),
-                            0.05f, new ColorFloat(0, 1, 0, OLD_DEBUG_TRANSPARENT)));
+                            0.05f, new ColorFloat(0, 1, 0, OLD_DEBUG_TRANSPARENCY)));
                     iterator.remove();
                     hitCount++;
                 } else if (bullet.isHittingAWall()) {
                     debug.draw(new CustomData.Line(vecUtil.toFloatVector(unitCenter), vecUtil.toFloatVector(bullet.position),
-                            0.05f, new ColorFloat(1, 0, 0, OLD_DEBUG_TRANSPARENT)));
+                            0.05f, new ColorFloat(1, 0, 0, OLD_DEBUG_TRANSPARENCY)));
                     iterator.remove();
                 }
             }
@@ -290,10 +294,10 @@ public class MyStrategy implements Strategy {
     }
 
     private Tile getTile(Vec2Double location) {
-        return game.getLevel().getTiles()[(int) Math.floor(location.getX())][(int) Math.floor(location.getY())];
+        return tiles[(int) location.getX()][(int) location.getY()];
     }
 
-    private LootBox getNearestWeapon(Unit unit, Game game) {
+    private LootBox getNearestWeapon() {
         LootBox nearestWeapon = null;
         for (LootBox lootBox : game.getLootBoxes()) {
             if (lootBox.getItem() instanceof Item.Weapon) {
@@ -304,6 +308,19 @@ public class MyStrategy implements Strategy {
             }
         }
         return nearestWeapon;
+    }
+
+    private LootBox getNearestMineBox() {
+        LootBox nearestMineLootBox = null;
+        for (LootBox lootBox : game.getLootBoxes()) {
+            if (lootBox.getItem() instanceof Item.Mine) {
+                if (nearestMineLootBox == null || distanceSqr(unit.getPosition(),
+                        lootBox.getPosition()) < distanceSqr(unit.getPosition(), nearestMineLootBox.getPosition())) {
+                    nearestMineLootBox = lootBox;
+                }
+            }
+        }
+        return nearestMineLootBox;
     }
 
     private LootBox getNearestHealthPack() {
@@ -319,7 +336,7 @@ public class MyStrategy implements Strategy {
         return nearestHealth;
     }
 
-    private Unit getNearestEnemy(Unit unit, Game game) {
+    private Unit getNearestEnemy() {
         Unit nearestEnemy = null;
         for (Unit other : game.getUnits()) {
             if (other.getPlayerId() != unit.getPlayerId()) {
@@ -435,14 +452,14 @@ public class MyStrategy implements Strategy {
         }
 
         public boolean isHittingAWall() {
-            int xMinusSize = (int) Math.floor(position.getX() - size / 2.0);
-            int xPlusSize = (int) Math.floor(position.getX() + size / 2.0);
-            int yMinusSize = (int) Math.floor(position.getY() - size / 2.0);
-            int yPlusSize = (int) Math.floor(position.getY() + size / 2.0);
-            Tile tile1 = game.getLevel().getTiles()[xMinusSize][yMinusSize];
-            Tile tile2 = game.getLevel().getTiles()[xPlusSize][yMinusSize];
-            Tile tile3 = game.getLevel().getTiles()[xMinusSize][yPlusSize];
-            Tile tile4 = game.getLevel().getTiles()[xPlusSize][yPlusSize];
+            int xMinusSize = (int) (position.getX() - size / 2.0);
+            int xPlusSize = (int) (position.getX() + size / 2.0);
+            int yMinusSize = (int) (position.getY() - size / 2.0);
+            int yPlusSize = (int) (position.getY() + size / 2.0);
+            Tile tile1 = tiles[xMinusSize][yMinusSize];
+            Tile tile2 = tiles[xPlusSize][yMinusSize];
+            Tile tile3 = tiles[xMinusSize][yPlusSize];
+            Tile tile4 = tiles[xPlusSize][yPlusSize];
             return tile1 == Tile.WALL || tile2 == Tile.WALL || tile3 == Tile.WALL || tile4 == Tile.WALL;
         }
 
@@ -588,7 +605,7 @@ public class MyStrategy implements Strategy {
                 return true;
             }
 
-            boolean sameVerticalTile = (0 == ((int) Math.floor(position.getY()) - (int) Math.floor(position.getY() - game.getProperties().getUnitFallSpeed() / updatesPerSecond)));
+            boolean sameVerticalTile = (0 == ((int) (position.getY()) - (int) (position.getY() - game.getProperties().getUnitFallSpeed() / updatesPerSecond)));
             Tile tile0u = getTile(vecUtil.add(position, new Vec2Double(-halfUnitSizeX, -game.getProperties().getUnitFallSpeed() / updatesPerSecond)));
             Tile tile1u = getTile(vecUtil.add(position, new Vec2Double(+halfUnitSizeX, -game.getProperties().getUnitFallSpeed() / updatesPerSecond)));
             return !sameVerticalTile && (tile0u == Tile.WALL || tile1u == Tile.WALL || tile0u == Tile.PLATFORM || tile1u == Tile.PLATFORM);
@@ -613,7 +630,7 @@ public class MyStrategy implements Strategy {
             if (tileUnderLeftLeg == Tile.PLATFORM || tileUnderRightLeg == Tile.PLATFORM) {
                 return Tile.PLATFORM;
             }
-//            game.getLevel().getTiles()[(int) Math.floor(location.getX())][(int) Math.floor(location.getY())];
+//            game.getLevel().getTiles()[(int) (location.getX())][(int) (location.getY())];
 //            getTile(position);
             return Tile.EMPTY;
         }
