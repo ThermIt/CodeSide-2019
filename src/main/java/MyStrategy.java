@@ -367,6 +367,10 @@ public class MyStrategy implements Strategy {
         void nextTick() {
             tick++;
         }
+
+        void resetTick() {
+            tick = 0;
+        }
     }
 
     class LeftRunningStrat extends DummyStrat {
