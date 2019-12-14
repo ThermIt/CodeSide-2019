@@ -538,15 +538,21 @@ public class MyStrategy implements Strategy {
             }
             // vertical
 
-            boolean isJumping = false;
+            boolean isFalling = true;
             if (isPositionAffectedByLadder(position)) {
-
+                isFalling = false;
+                if (jumpingUp) {
+                    Vec2Double newPosition = vecUtil.add(position, new Vec2Double(0, game.getProperties().getUnitJumpSpeed() / updatesPerSecond));
+                    if (isPositionPossible(newPosition)) {
+                        position = newPosition;
+                    }
+                }
             } else if (canJumpForSeconds > 0.0) {
                 if (jumpingUp || !canCancelJump) {
                     Vec2Double newPosition = vecUtil.add(position, new Vec2Double(0, jumpSpeed / updatesPerSecond));
                     if (isPositionPossible(newPosition)) {
                         position = newPosition;
-                        isJumping = true;
+                        isFalling = false;
                     } else {
                         canCancelJump = true;
                         canJumpForSeconds = 0.0;
@@ -555,7 +561,7 @@ public class MyStrategy implements Strategy {
                 }
                 canJumpForSeconds -= 1.0 / updatesPerSecond;
             }
-            if (!isJumping && (!isStandingPosition(position) || jumpingDown)) {
+            if (isFalling && (!isStandingPosition(position) || jumpingDown)) {
                 Vec2Double newPosition = vecUtil.add(position, new Vec2Double(0, -game.getProperties().getUnitFallSpeed() / updatesPerSecond));
                 if (isPositionPossible(newPosition)) {
                     position = newPosition;
@@ -609,30 +615,6 @@ public class MyStrategy implements Strategy {
             Tile tile0u = getTile(vecUtil.add(position, new Vec2Double(-halfUnitSizeX, -game.getProperties().getUnitFallSpeed() / updatesPerSecond)));
             Tile tile1u = getTile(vecUtil.add(position, new Vec2Double(+halfUnitSizeX, -game.getProperties().getUnitFallSpeed() / updatesPerSecond)));
             return !sameVerticalTile && (tile0u == Tile.WALL || tile1u == Tile.WALL || tile0u == Tile.PLATFORM || tile1u == Tile.PLATFORM);
-        }
-
-        public Tile afffectedByTile() {
-            // intersects with a jump pad
-            Tile tile00 = getTile(vecUtil.add(position, new Vec2Double(-halfUnitSizeX, 0.0)));
-            Tile tile10 = getTile(vecUtil.add(position, new Vec2Double(+halfUnitSizeX, 0.0)));
-            Tile tile01 = getTile(vecUtil.add(position, new Vec2Double(-halfUnitSizeX, unit.getSize().getY() / 2.0)));
-            Tile tile11 = getTile(vecUtil.add(position, new Vec2Double(+halfUnitSizeX, unit.getSize().getY() / 2.0)));
-            Tile tile02 = getTile(vecUtil.add(position, new Vec2Double(-halfUnitSizeX, unit.getSize().getY())));
-            Tile tile12 = getTile(vecUtil.add(position, new Vec2Double(+halfUnitSizeX, unit.getSize().getY())));
-            if (tile00 == Tile.JUMP_PAD || tile10 == Tile.JUMP_PAD || tile01 == Tile.JUMP_PAD || tile11 == Tile.JUMP_PAD || tile02 == Tile.JUMP_PAD || tile12 == Tile.JUMP_PAD) {
-                return Tile.JUMP_PAD;
-            }
-            Tile tileUnderLeftLeg = getTile(vecUtil.add(position, new Vec2Double(-halfUnitSizeX + EPSILON, -game.getProperties().getUnitFallSpeed() / updatesPerSecond)));
-            Tile tileUnderRightLeg = getTile(vecUtil.add(position, new Vec2Double(+halfUnitSizeX - EPSILON, -game.getProperties().getUnitFallSpeed() / updatesPerSecond)));
-            if (tileUnderLeftLeg == Tile.WALL || tileUnderRightLeg == Tile.WALL) {
-                return Tile.WALL;
-            }
-            if (tileUnderLeftLeg == Tile.PLATFORM || tileUnderRightLeg == Tile.PLATFORM) {
-                return Tile.PLATFORM;
-            }
-//            game.getLevel().getTiles()[(int) (location.getX())][(int) (location.getY())];
-//            getTile(position);
-            return Tile.EMPTY;
         }
 
         public DummyStrat getStrat() {
