@@ -91,4 +91,9 @@ public class VectorUtils {
         return new Vec2Double(x, y);
     }
 
+    public double angleBetween(Vec2Double vector1, Vec2Double vector2) {
+        double d = (vector1.getX() * vector2.getX() + vector1.getY() * vector2.getY()) / (length(vector1) * length(vector2));
+        return StrictMath.acos(d) / Math.PI * 180.0;
+    }
+
 }
