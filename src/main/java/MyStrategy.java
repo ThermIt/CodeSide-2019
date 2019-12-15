@@ -78,27 +78,40 @@ public class MyStrategy implements Strategy {
         runningPos = jumpPadHack(runningPos);
 
         setJumpAndVelocity(runningPos, jump, action);
-        double hitPNew = hitProbability(nearestEnemy, aim);
-        double hitPOld = 0.0;
-        if (unit.getWeapon() != null && unit.getWeapon().getLastAngle() != null) {
-            hitPOld = hitProbability(nearestEnemy, vecUtil.fromAngle(unit.getWeapon().getLastAngle(), 10.0));
-        }
-        if (hitPNew - hitPOld >= 0.02 || unit.getWeapon() == null) {
-            action.setAim(vecUtil.normalize(aim, 10.0));
-        } else {
-            hitPNew = hitPOld;
-            action.setAim(vecUtil.fromAngle(unit.getWeapon().getLastAngle(), 10.0));
-        }
-        if (unit.getWeapon() != null && unit.getWeapon().getTyp() == WeaponType.ROCKET_LAUNCHER) {
-            if (hitPNew > 0.3) {
+
+        if (unit.getWeapon() != null) {
+            double spread = unit.getWeapon().getSpread();
+            if (unit.getWeapon().getLastAngle() != null) {
+                spread = Math.min(spread + vecUtil.angleBetween(aim, vecUtil.fromAngle(unit.getWeapon().getLastAngle(), 10.0)), unit.getWeapon().getParams().getMaxSpread());
+            }
+            HitProbabilities hitPNew = hitProbability(aim, spread);
+            HitProbabilities hitPOld = HitProbabilities.EMPTY;
+            if (unit.getWeapon() != null && unit.getWeapon().getLastAngle() != null) {
+                hitPOld = hitProbability(vecUtil.fromAngle(unit.getWeapon().getLastAngle(), 10.0), unit.getWeapon().getSpread());
+            }
+            if (hitPNew.getEnemyProbability() - hitPOld.getEnemyProbability() >= 0.02 || unit.getWeapon() == null) {
+                action.setAim(vecUtil.normalize(aim, 10.0));
+            } else {
+                hitPNew = hitPOld;
+                action.setAim(vecUtil.fromAngle(unit.getWeapon().getLastAngle(), 10.0));
+            }
+            if (unit.getWeapon() != null && unit.getWeapon().getTyp() == WeaponType.ROCKET_LAUNCHER) {
+                if (hitPNew.getEnemyProbability() > 0.3) {
+                    if (hitPNew.getEnemyProbability() >= hitPNew.getAllyProbability()) {
+                        action.setShoot(true);
+                    }
+                }
+            } else if (hitPNew.getEnemyProbability() > 0.05) {
                 action.setShoot(true);
             }
-        } else if (hitPNew > 0.05) {
-            action.setShoot(true);
-        }
 
-        if (unit.getWeapon() != null && unit.getWeapon().getMagazine() == 0) {
+            if (unit.getWeapon() != null && unit.getWeapon().getMagazine() == 0) {
+                action.setReload(true);
+            }
+        } else {
             action.setReload(true);
+            action.setShoot(false);
+            action.setAim(vecUtil.normalize(aim, 10.0));
         }
 
         action.setPlantMine(nearestEnemy != null && vecUtil.length(vecUtil.substract(nearestEnemy.getPosition(), unit.getPosition())) < game.getProperties().getMineExplosionParams().getRadius());
@@ -152,8 +165,7 @@ public class MyStrategy implements Strategy {
         Set<Dummy> survivors = new HashSet<>(dummies);
 
         for (int tick = 0; tick < 100; tick++) {
-            dummies = new HashSet<>(survivors);
-            ; // hack optimization
+            dummies = new HashSet<>(survivors); // hack optimization
             for (int j = 0; j < game.getProperties().getUpdatesPerTick(); j++) {
                 for (Iterator<DummyBullet> iterator = bullets.iterator(); iterator.hasNext(); ) {
                     DummyBullet bullet = iterator.next();
@@ -279,7 +291,7 @@ public class MyStrategy implements Strategy {
         if (unit.getWeapon() == null) {
             return new Vec2Double(0.0, 0.0);
         }
-        if ((unit.getWeapon().getFireTimer() != null && unit.getWeapon().getFireTimer() > 1.0) || unit.getWeapon().getMagazine() == 0) {
+        if ((unit.getWeapon().getFireTimer() != null && unit.getWeapon().getFireTimer() > 5.0/game.getProperties().getTicksPerSecond()) || unit.getWeapon().getMagazine() == 0) {
             return new Vec2Double(0.0, 0.0);
         }
         Vec2Double unitCenter = vecUtil.getCenter(unit);
@@ -329,51 +341,113 @@ public class MyStrategy implements Strategy {
         return vecUtil.substract(vecUtil.scale(hitVector, 1.0 / (double) hitCount), unitCenter);
     }
 
-    private double hitProbability(Unit enemy, Vec2Double aim) {
+    private HitProbabilities hitProbability(Vec2Double aim, double spread) {
         if (unit.getWeapon() == null) {
-            return 0.0;
+            return HitProbabilities.EMPTY;
         }
-        if ((unit.getWeapon().getFireTimer() != null && unit.getWeapon().getFireTimer() > 1.0) || unit.getWeapon().getMagazine() == 0) {
-            return 0.0;
+        if ((unit.getWeapon().getFireTimer() != null && unit.getWeapon().getFireTimer() > 3.0/game.getProperties().getTicksPerSecond()) || unit.getWeapon().getMagazine() == 0) {
+            return HitProbabilities.EMPTY;
         }
         Vec2Double unitCenter = vecUtil.getCenter(unit);
-        int hitCount = 0;
         int maxHitCount = 51;
+        HitProbabilities hitProbabilities = new HitProbabilities(maxHitCount);
         List<DummyBullet> bullets = new ArrayList<>();
         double baseAngle = vecUtil.getAngle(aim);
         int maxSpread = (maxHitCount - 1) / 2;
         for (int i = -maxSpread; i <= maxSpread; i++) {
-            Vec2Double adjustedDirection = vecUtil.fromAngle(baseAngle + i / (double) maxSpread * unit.getWeapon().getSpread(), 10.0);
+            Vec2Double adjustedDirection = vecUtil.fromAngle(baseAngle + i / (double) maxSpread * spread, 10.0);
             DummyBullet dummyBullet = new DummyBullet(unit.getWeapon().getParams().getBullet(), unit.getWeapon().getParams().getExplosion(), unitCenter, adjustedDirection, unit.getId());
             bullets.add(dummyBullet);
         }
-        Dummy enemyDummy = new Dummy(enemy);
+        Set<Dummy> dummies = new HashSet<>();
+        for (Unit unit : game.getUnits()) {
+            dummies.add(new Dummy(unit));
+        }
         while (bullets.size() > 0) {
             for (Iterator<DummyBullet> iterator = bullets.iterator(); iterator.hasNext(); ) {
                 DummyBullet bullet = iterator.next();
+                boolean hitDetected = false;
                 bullet.moveOneUpdateHorizontally();
-                bullet.moveOneUpdateVertically();
-                if (bullet.isHittingTheDummy(enemyDummy)) {
-                    debug.draw(new CustomData.Line(vecUtil.toFloatVector(unitCenter), vecUtil.toFloatVector(bullet.position),
-                            0.05f, new ColorFloat(0, 1, 0, OLD_DEBUG_TRANSPARENCY)));
-                    iterator.remove();
-                    hitCount++;
-                } else if (bullet.isHittingAWall()) {
-                    if (bullet.isHittingTheDummyWithExplosion(enemyDummy)) {
-                        debug.draw(new CustomData.Line(vecUtil.toFloatVector(unitCenter), vecUtil.toFloatVector(bullet.position),
-                                0.05f, new ColorFloat(0, 1, 0, OLD_DEBUG_TRANSPARENCY)));
-                        hitCount++;
-                    } else {
-                        debug.draw(new CustomData.Line(vecUtil.toFloatVector(unitCenter), vecUtil.toFloatVector(bullet.position),
-                                0.05f, new ColorFloat(1, 0, 0, OLD_DEBUG_TRANSPARENCY)));
+                for (Dummy dummy : dummies) {
+                    if (bullet.isHittingTheDummy(dummy)) {
+                        onBulletHittingADummy(unitCenter, hitProbabilities, bullet, dummy);
+                        explodeBullet(unitCenter, hitProbabilities, dummies, bullet);
+                        hitDetected = true;
                     }
+                }
+                if (bullet.isHittingAWall()) {
+                    hitDetected = true;
+                    explodeBullet(unitCenter, hitProbabilities, dummies, bullet);
+                }
+                if (hitDetected) {
                     iterator.remove();
                 }
             }
-            enemyDummy.moveOneUpdateHorizontally();
-            enemyDummy.moveOneUpdateVerically();
+            for (Dummy dummy : dummies) {
+                dummy.moveOneUpdateHorizontally();
+                for (Iterator<DummyBullet> iterator = bullets.iterator(); iterator.hasNext(); ) {
+                    DummyBullet bullet = iterator.next();
+                    if (bullet.isHittingTheDummy(dummy)) {
+                        onBulletHittingADummy(unitCenter, hitProbabilities, bullet, dummy);
+                        explodeBullet(unitCenter, hitProbabilities, dummies, bullet);
+                        iterator.remove();
+                    }
+                }
+            }
+
+            for (Iterator<DummyBullet> iterator = bullets.iterator(); iterator.hasNext(); ) {
+                DummyBullet bullet = iterator.next();
+                boolean hitDetected = false;
+                bullet.moveOneUpdateVertically();
+                for (Dummy dummy : dummies) {
+                    if (bullet.isHittingTheDummy(dummy)) {
+                        onBulletHittingADummy(unitCenter, hitProbabilities, bullet, dummy);
+                        explodeBullet(unitCenter, hitProbabilities, dummies, bullet);
+                        hitDetected = true;
+                    }
+                }
+                if (bullet.isHittingAWall()) {
+                    hitDetected = true;
+                    explodeBullet(unitCenter, hitProbabilities, dummies, bullet);
+                }
+                if (hitDetected) {
+                    iterator.remove();
+                }
+            }
+            for (Dummy dummy : dummies) {
+                dummy.moveOneUpdateVerically();
+                for (Iterator<DummyBullet> iterator = bullets.iterator(); iterator.hasNext(); ) {
+                    DummyBullet bullet = iterator.next();
+                    if (bullet.isHittingTheDummy(dummy)) {
+                        onBulletHittingADummy(unitCenter, hitProbabilities, bullet, dummy);
+                        explodeBullet(unitCenter, hitProbabilities, dummies, bullet);
+                        iterator.remove();
+                    }
+                }
+            }
+
         }
-        return hitCount / (double) maxHitCount;
+        return hitProbabilities;
+    }
+
+    private void explodeBullet(Vec2Double unitCenter, HitProbabilities hitProbabilities, Set<Dummy> dummies, DummyBullet bullet) {
+        for (Dummy dummy : dummies) {
+            if (bullet.isHittingTheDummyWithExplosion(dummy)) {
+                onBulletHittingADummy(unitCenter, hitProbabilities, bullet, dummy);
+            }
+        }
+    }
+
+    private void onBulletHittingADummy(Vec2Double unitCenter, HitProbabilities hitProbabilities, DummyBullet bullet, Dummy dummy) {
+        if (dummy.unit.getPlayerId() == unit.getPlayerId()) {
+            debug.draw(new CustomData.Line(vecUtil.toFloatVector(unitCenter), vecUtil.toFloatVector(bullet.position),
+                    0.05f, new ColorFloat(0, 0, 1, OLD_DEBUG_TRANSPARENCY)));
+            hitProbabilities.allyHitCount++;
+        } else {
+            debug.draw(new CustomData.Line(vecUtil.toFloatVector(unitCenter), vecUtil.toFloatVector(bullet.position),
+                    0.05f, new ColorFloat(0, 1, 0, OLD_DEBUG_TRANSPARENCY)));
+            hitProbabilities.enemyHitCount++;
+        }
     }
 
     private Tile getTile(Vec2Double location) {
@@ -432,6 +506,25 @@ public class MyStrategy implements Strategy {
             }
         }
         return nearestEnemy;
+    }
+
+    static class HitProbabilities {
+        static final HitProbabilities EMPTY = new HitProbabilities(1);
+        int enemyHitCount = 0;
+        int allyHitCount = 0;
+        int maxHitCount;
+
+        public HitProbabilities(int maxHitCount) {
+            this.maxHitCount = maxHitCount;
+        }
+
+        public double getEnemyProbability() {
+            return enemyHitCount / (double) maxHitCount;
+        }
+
+        public double getAllyProbability() {
+            return allyHitCount / (double) maxHitCount;
+        }
     }
 
     class DummyStrat {
