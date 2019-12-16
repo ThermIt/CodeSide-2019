@@ -89,23 +89,26 @@ public class MyStrategy implements Strategy {
             if (unit.getWeapon() != null && unit.getWeapon().getLastAngle() != null) {
                 hitPOld = hitProbability(vecUtil.fromAngle(unit.getWeapon().getLastAngle(), 10.0), unit.getWeapon().getSpread());
             }
-            if (hitPNew.getEnemyProbability() - hitPOld.getEnemyProbability() >= 0.02 || unit.getWeapon() == null) {
+            if (hitPNew.getEnemyHitProbability() - hitPOld.getEnemyHitProbability() >= 0.02 || unit.getWeapon() == null || unit.getWeapon().getLastAngle() == null) {
                 action.setAim(vecUtil.normalize(aim, 10.0));
             } else {
                 hitPNew = hitPOld;
-                if (unit.getWeapon().getLastAngle() != null) {
-                    action.setAim(vecUtil.fromAngle(unit.getWeapon().getLastAngle(), 10.0));
+                Vec2Double lastAim = vecUtil.fromAngle(unit.getWeapon().getLastAngle(), 10.0);
+                if (vecUtil.angleBetween(aim, lastAim) > Math.PI / 4) {
+                    action.setAim(lastAim);
                 } else {
-                    action.setAim(vecUtil.normalize(aim, 10.0));
+                    action.setAim(aim);
                 }
             }
             if (unit.getWeapon() != null && unit.getWeapon().getTyp() == WeaponType.ROCKET_LAUNCHER) {
-                if (hitPNew.getEnemyProbability() > 0.3) {
-                    if (hitPNew.getEnemyProbability() >= hitPNew.getAllyProbability()) {
+                if (hitPNew.getAllyExplosionProbability() > 0.05) {
+                    action.setShoot(false);
+                } else if (hitPNew.getEnemyHitProbability() > 0.3) {
+                    if (hitPNew.getEnemyHitProbability() >= hitPNew.getAllyHitProbability()) {
                         action.setShoot(true);
                     }
                 }
-            } else if (hitPNew.getEnemyProbability() > 0.05) {
+            } else if (hitPNew.getEnemyHitProbability() > 0.05) {
                 action.setShoot(true);
             }
 
@@ -354,7 +357,6 @@ public class MyStrategy implements Strategy {
         }
         Vec2Double unitCenter = vecUtil.getCenter(unit);
         int maxHitCount = 51;
-        HitProbabilities hitProbabilities = new HitProbabilities(maxHitCount);
         List<DummyBullet> bullets = new ArrayList<>();
         double baseAngle = vecUtil.getAngle(aim);
         int maxSpread = (maxHitCount - 1) / 2;
@@ -367,7 +369,8 @@ public class MyStrategy implements Strategy {
         for (Unit unit : game.getUnits()) {
             dummies.add(new Dummy(unit));
         }
-        while (bullets.size() > 0) {
+        HitProbabilities hitProbabilities = new HitProbabilities(maxHitCount);
+        while (bullets.size() > 0) { // update
             for (Iterator<DummyBullet> iterator = bullets.iterator(); iterator.hasNext(); ) {
                 DummyBullet bullet = iterator.next();
                 boolean hitDetected = false;
@@ -429,16 +432,26 @@ public class MyStrategy implements Strategy {
                     }
                 }
             }
-
         }
         return hitProbabilities;
     }
 
     private void explodeBullet(Vec2Double unitCenter, HitProbabilities hitProbabilities, Set<Dummy> dummies, DummyBullet bullet) {
+        int explodedEnemies = 0;
+        int explodedAllies = 0;
+
         for (Dummy dummy : dummies) {
             if (bullet.isHittingTheDummyWithExplosion(dummy)) {
                 onBulletHittingADummy(unitCenter, hitProbabilities, bullet, dummy);
+                if (dummy.unit.getPlayerId() == unit.getPlayerId()) {
+                    explodedAllies++;
+                } else {
+                    explodedEnemies++;
+                }
             }
+        }
+        if (explodedAllies > explodedEnemies) {
+            hitProbabilities.allyExplosionCount++;
         }
     }
 
@@ -516,18 +529,23 @@ public class MyStrategy implements Strategy {
         static final HitProbabilities EMPTY = new HitProbabilities(1);
         int enemyHitCount = 0;
         int allyHitCount = 0;
+        int allyExplosionCount = 0;
         int maxHitCount;
 
         public HitProbabilities(int maxHitCount) {
             this.maxHitCount = maxHitCount;
         }
 
-        public double getEnemyProbability() {
+        public double getEnemyHitProbability() {
             return enemyHitCount / (double) maxHitCount;
         }
 
-        public double getAllyProbability() {
+        public double getAllyHitProbability() {
             return allyHitCount / (double) maxHitCount;
+        }
+
+        public double getAllyExplosionProbability() {
+            return allyExplosionCount / (double) maxHitCount;
         }
     }
 
