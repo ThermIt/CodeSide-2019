@@ -76,7 +76,12 @@ public class MyOlderStrategy implements Strategy {
             action.setAim(vecUtil.normalize(aim, 10.0));
         } else {
             hitPNew = hitPOld;
-            action.setAim(vecUtil.fromAngle(unit.getWeapon().getLastAngle(), 10.0));
+            if (unit.getWeapon().getLastAngle() != null) {
+                action.setAim(vecUtil.fromAngle(unit.getWeapon().getLastAngle(), 10.0));
+            } else {
+                action.setAim(vecUtil.normalize(aim, 10.0));
+            }
+
         }
         if (unit.getWeapon() != null && unit.getWeapon().getTyp() == WeaponType.ROCKET_LAUNCHER) {
             if (hitPNew > 0.3) {
@@ -268,7 +273,7 @@ public class MyOlderStrategy implements Strategy {
         if (unit.getWeapon() == null) {
             return new Vec2Double(0.0, 0.0);
         }
-        if ((unit.getWeapon().getFireTimer() != null && unit.getWeapon().getFireTimer() > 3.0/game.getProperties().getTicksPerSecond()) || unit.getWeapon().getMagazine() == 0) {
+        if ((unit.getWeapon().getFireTimer() != null && unit.getWeapon().getFireTimer() > 3.0 / game.getProperties().getTicksPerSecond()) || unit.getWeapon().getMagazine() == 0) {
             return new Vec2Double(0.0, 0.0);
         }
         Vec2Double unitCenter = vecUtil.getCenter(unit);
@@ -315,7 +320,7 @@ public class MyOlderStrategy implements Strategy {
         if (unit.getWeapon() == null) {
             return 0.0;
         }
-        if ((unit.getWeapon().getFireTimer() != null && unit.getWeapon().getFireTimer() > 3.0/game.getProperties().getTicksPerSecond()) || unit.getWeapon().getMagazine() == 0) {
+        if ((unit.getWeapon().getFireTimer() != null && unit.getWeapon().getFireTimer() > 3.0 / game.getProperties().getTicksPerSecond()) || unit.getWeapon().getMagazine() == 0) {
             return 0.0;
         }
         Vec2Double unitCenter = vecUtil.getCenter(unit);

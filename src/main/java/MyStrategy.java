@@ -93,7 +93,11 @@ public class MyStrategy implements Strategy {
                 action.setAim(vecUtil.normalize(aim, 10.0));
             } else {
                 hitPNew = hitPOld;
-                action.setAim(vecUtil.fromAngle(unit.getWeapon().getLastAngle(), 10.0));
+                if (unit.getWeapon().getLastAngle() != null) {
+                    action.setAim(vecUtil.fromAngle(unit.getWeapon().getLastAngle(), 10.0));
+                } else {
+                    action.setAim(vecUtil.normalize(aim, 10.0));
+                }
             }
             if (unit.getWeapon() != null && unit.getWeapon().getTyp() == WeaponType.ROCKET_LAUNCHER) {
                 if (hitPNew.getEnemyProbability() > 0.3) {
@@ -136,10 +140,10 @@ public class MyStrategy implements Strategy {
         List<DummyBullet> bullets = new ArrayList<>();
         for (Bullet bullet : game.getBullets()) {
             if (bullet.getUnitId() != unit.getId()) {
-                DummyBullet dummyBullet = new DummyBullet(bullet);
+                DummyBullet dummyBullet = new DummyBullet(bullet, true);
                 bullets.add(dummyBullet);
             } else if (bullet.getExplosionParams() != null && bullet.getExplosionParams().getRadius() > 0) {
-                DummyBullet dummyBullet = new DummyBullet(bullet);
+                DummyBullet dummyBullet = new DummyBullet(bullet, true);
                 bullets.add(dummyBullet);
             }
         }
@@ -291,7 +295,7 @@ public class MyStrategy implements Strategy {
         if (unit.getWeapon() == null) {
             return new Vec2Double(0.0, 0.0);
         }
-        if ((unit.getWeapon().getFireTimer() != null && unit.getWeapon().getFireTimer() > 5.0/game.getProperties().getTicksPerSecond()) || unit.getWeapon().getMagazine() == 0) {
+        if ((unit.getWeapon().getFireTimer() != null && unit.getWeapon().getFireTimer() > 5.0 / game.getProperties().getTicksPerSecond()) || unit.getWeapon().getMagazine() == 0) {
             return new Vec2Double(0.0, 0.0);
         }
         Vec2Double unitCenter = vecUtil.getCenter(unit);
@@ -345,7 +349,7 @@ public class MyStrategy implements Strategy {
         if (unit.getWeapon() == null) {
             return HitProbabilities.EMPTY;
         }
-        if ((unit.getWeapon().getFireTimer() != null && unit.getWeapon().getFireTimer() > 3.0/game.getProperties().getTicksPerSecond()) || unit.getWeapon().getMagazine() == 0) {
+        if ((unit.getWeapon().getFireTimer() != null && unit.getWeapon().getFireTimer() > 3.0 / game.getProperties().getTicksPerSecond()) || unit.getWeapon().getMagazine() == 0) {
             return HitProbabilities.EMPTY;
         }
         Vec2Double unitCenter = vecUtil.getCenter(unit);
@@ -630,11 +634,15 @@ public class MyStrategy implements Strategy {
 
 
         public DummyBullet(Bullet bullet) {
+            this(bullet, false);
+        }
+
+        public DummyBullet(Bullet bullet, boolean increaseSize) {
             this.position = vecUtil.clone(bullet.getPosition());
             this.velocity = vecUtil.clone(bullet.getVelocity());
-            this.size = bullet.getSize();
+            this.size = increaseSize ? bullet.getSize() + 0.005 : bullet.getSize();
             if (bullet.getExplosionParams() != null) {
-                this.explosionRadius = bullet.getExplosionParams().getRadius();
+                this.explosionRadius = increaseSize ? bullet.getExplosionParams().getRadius() + 0.05 : bullet.getExplosionParams().getRadius();
             }
             this.unitId = bullet.getUnitId();
 
