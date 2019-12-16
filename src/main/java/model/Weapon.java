@@ -99,4 +99,18 @@ public class Weapon {
             StreamUtil.writeInt(stream, lastFireTick);
         }
     }
+
+    @Override
+    public String toString() {
+        return "Weapon{" +
+                "typ=" + typ +
+//                ", params=" + params +
+                ", magazine=" + magazine +
+                ", wasShooting=" + wasShooting +
+                ", spread=" + spread +
+                ", fireTimer=" + fireTimer +
+                ", lastAngle=" + lastAngle +
+                ", lastFireTick=" + lastFireTick +
+                '}';
+    }
 }

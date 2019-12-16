@@ -97,6 +97,7 @@ public class MyOlderStrategy implements Strategy {
 
         action.setPlantMine(nearestEnemy != null && vecUtil.length(vecUtil.substract(nearestEnemy.getPosition(), unit.getPosition())) < game.getProperties().getMineExplosionParams().getRadius());
 
+//        System.out.println("" + game.getCurrentTick() + ":" + unit.getId() + ":" + action+":"+unit.getWeapon());
         return action;
     }
 

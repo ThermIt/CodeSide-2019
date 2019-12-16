@@ -24,4 +24,12 @@ public class Vec2Double {
         StreamUtil.writeDouble(stream, x);
         StreamUtil.writeDouble(stream, y);
     }
+
+    @Override
+    public String toString() {
+        return "Vec2Double{" +
+                "x=" + x +
+                ", y=" + y +
+                '}';
+    }
 }

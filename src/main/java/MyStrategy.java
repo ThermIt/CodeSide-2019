@@ -86,7 +86,7 @@ public class MyStrategy implements Strategy {
             }
             HitProbabilities hitPNew = hitProbability(aim, spread);
             HitProbabilities hitPOld = HitProbabilities.EMPTY;
-            if (unit.getWeapon() != null && unit.getWeapon().getLastAngle() != null) {
+            if (unit.getWeapon().getLastAngle() != null) {
                 hitPOld = hitProbability(vecUtil.fromAngle(unit.getWeapon().getLastAngle(), 10.0), unit.getWeapon().getSpread());
             }
             if (hitPNew.getEnemyHitProbability() - hitPOld.getEnemyHitProbability() >= 0.02 || unit.getWeapon() == null || unit.getWeapon().getLastAngle() == null) {
@@ -94,13 +94,13 @@ public class MyStrategy implements Strategy {
             } else {
                 hitPNew = hitPOld;
                 Vec2Double lastAim = vecUtil.fromAngle(unit.getWeapon().getLastAngle(), 10.0);
-                if (vecUtil.angleBetween(aim, lastAim) > Math.PI / 4) {
+                if (vecUtil.angleBetween(aim, lastAim) < Math.PI / 4.0) {
                     action.setAim(lastAim);
                 } else {
-                    action.setAim(aim);
+                    action.setAim(vecUtil.normalize(aim, 10.0));
                 }
             }
-            if (unit.getWeapon() != null && unit.getWeapon().getTyp() == WeaponType.ROCKET_LAUNCHER) {
+            if (unit.getWeapon().getTyp() == WeaponType.ROCKET_LAUNCHER) {
                 if (hitPNew.getAllyExplosionProbability() > 0.05) {
                     action.setShoot(false);
                 } else if (hitPNew.getEnemyHitProbability() > 0.3) {
@@ -112,17 +112,18 @@ public class MyStrategy implements Strategy {
                 action.setShoot(true);
             }
 
-            if (unit.getWeapon() != null && unit.getWeapon().getMagazine() == 0) {
+            if (unit.getWeapon().getMagazine() == 0) {
                 action.setReload(true);
             }
         } else {
-            action.setReload(true);
+            action.setReload(false);
             action.setShoot(false);
             action.setAim(vecUtil.normalize(aim, 10.0));
         }
 
         action.setPlantMine(nearestEnemy != null && vecUtil.length(vecUtil.substract(nearestEnemy.getPosition(), unit.getPosition())) < game.getProperties().getMineExplosionParams().getRadius());
 
+//        System.out.println("" + game.getCurrentTick() + ":" + unit.getId() + ":" + action+":"+unit.getWeapon());
         return action;
     }
 

@@ -60,4 +60,18 @@ public class UnitAction {
         StreamUtil.writeBoolean(stream, swapWeapon);
         StreamUtil.writeBoolean(stream, plantMine);
     }
+
+    @Override
+    public String toString() {
+        return "UnitAction{" +
+                "velocity=" + velocity +
+                ", jump=" + jump +
+                ", jumpDown=" + jumpDown +
+                ", aim=" + aim +
+                ", shoot=" + shoot +
+                ", reload=" + reload +
+                ", swapWeapon=" + swapWeapon +
+                ", plantMine=" + plantMine +
+                '}';
+    }
 }
