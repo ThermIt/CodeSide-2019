@@ -68,7 +68,7 @@ public class VectorUtils {
     }
 
     public Vec2Double getCenter(Vec2Double position, Vec2Double size) {
-        return add(position, removeX(scale(size, 0.5)));
+        return new Vec2Double(position.getX(), position.getY() + size.getY() / 2.0);
     }
 
     public double getAngle(Vec2Double vector) {

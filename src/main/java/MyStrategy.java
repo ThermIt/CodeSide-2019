@@ -9,7 +9,7 @@ public class MyStrategy implements Strategy {
 
     public static final double HEALTH_TO_LOOK_FOR_HEAL = 0.90;
     private static final double EPSILON = 0.000000000001;
-    private static final float OLD_DEBUG_TRANSPARENCY = 0.1f;
+    private static final float OLD_DEBUG_TRANSPARENCY = 0.2f;
     VectorUtils vecUtil = new VectorUtils();
     private Unit unit;
     private Game game;
@@ -24,10 +24,12 @@ public class MyStrategy implements Strategy {
 
     @Override
     public UnitAction getAction(Unit unit, Game game, Debug debug) {
-        // TODO: 3. поиск пути
-        // TODO: 4. минимальный aim
-        // TODO: 5. вероятность подстрелить себя ракетой
-        // TODO: 6. отстрел мин
+        // TODO: 1. поиск пути между мин и врагов
+        // TODO: 2. минимальный aim
+        // TODO: 3. отстрел мин
+        // TODO: 4. предсказание взрывов мин
+
+//        this.debug.enable();
 
         this.unit = unit;
         this.game = game;
@@ -123,7 +125,10 @@ public class MyStrategy implements Strategy {
 
         action.setPlantMine(nearestEnemy != null && vecUtil.length(vecUtil.substract(nearestEnemy.getPosition(), unit.getPosition())) < game.getProperties().getMineExplosionParams().getRadius());
 
-//        System.out.println("" + game.getCurrentTick() + ":" + unit.getId() + ":" + action+":"+unit.getWeapon());
+        if (debug.isEnabled()) {
+            System.out.println("" + game.getCurrentTick() + ":" + unit.getId() + ":" + action + ":" + unit.getWeapon());
+        }
+
         return action;
     }
 
@@ -283,14 +288,10 @@ public class MyStrategy implements Strategy {
     }
 
     private Vec2Double jumpPadHack(Vec2Double runningPos) {
-        Vec2Double left10 = vecUtil.add(runningPos, new Vec2Double(-1.0, 0.0));
-        Vec2Double left05 = vecUtil.add(runningPos, new Vec2Double(-0.5, 0.0));
-        Vec2Double right10 = vecUtil.add(runningPos, new Vec2Double(1.0, 0.0));
-        Vec2Double right05 = vecUtil.add(runningPos, new Vec2Double(0.5, 0.0));
-        if (getTile(left10) == Tile.JUMP_PAD) {
-            runningPos = right05;
-        } else if (getTile(right10) == Tile.JUMP_PAD) {
-            runningPos = left05;
+        if (getTile(runningPos.getX() - 1.0, runningPos.getY()) == Tile.JUMP_PAD) {
+            runningPos.setX(runningPos.getX() + 0.5);
+        } else if (getTile(runningPos.getX() + 1.0, runningPos.getY()) == Tile.JUMP_PAD) {
+            runningPos.setX(runningPos.getX() - 0.5);
         }
         return runningPos;
     }
@@ -322,18 +323,22 @@ public class MyStrategy implements Strategy {
                 bullet.moveOneUpdateHorizontally();
                 bullet.moveOneUpdateVertically();
                 if (bullet.isHittingTheDummy(enemyDummy)) {
-                    debug.draw(new CustomData.Line(vecUtil.toFloatVector(unitCenter), vecUtil.toFloatVector(bullet.position),
-                            0.05f, new ColorFloat(0, 1, 1, 0.1f)));
+                    if (debug.isEnabled()) {
+                        debug.draw(new CustomData.Line(vecUtil.toFloatVector(unitCenter), vecUtil.toFloatVector(bullet.position),
+                                0.05f, new ColorFloat(0, 1, 1, 0.1f)));
+                    }
                     iterator.remove();
                     hitCount++;
                     hitVector = vecUtil.add(bullet.position, hitVector);
                 } else if (bullet.isHittingAWall()) {
                     if (bullet.isHittingTheDummy(enemyDummy)) {
-                        debug.draw(new CustomData.Line(vecUtil.toFloatVector(unitCenter), vecUtil.toFloatVector(bullet.position),
-                                0.05f, new ColorFloat(0, 1, 1, 0.1f)));
+                        if (debug.isEnabled()) {
+                            debug.draw(new CustomData.Line(vecUtil.toFloatVector(unitCenter), vecUtil.toFloatVector(bullet.position),
+                                    0.05f, new ColorFloat(0, 1, 1, 0.1f)));
+                        }
                         hitCount++;
                         hitVector = vecUtil.add(bullet.position, hitVector);
-                    } else {
+                    } else if (debug.isEnabled()) {
                         debug.draw(new CustomData.Line(vecUtil.toFloatVector(unitCenter), vecUtil.toFloatVector(bullet.position),
                                 0.05f, new ColorFloat(1, 0, 1, OLD_DEBUG_TRANSPARENCY)));
                     }
@@ -357,7 +362,7 @@ public class MyStrategy implements Strategy {
             return HitProbabilities.EMPTY;
         }
         Vec2Double unitCenter = vecUtil.getCenter(unit);
-        int maxHitCount = 51;
+        int maxHitCount = Math.min(51, 1 + 2 * ((int) (180.0 * spread / Math.PI)));
         List<DummyBullet> bullets = new ArrayList<>();
         double baseAngle = vecUtil.getAngle(aim);
         int maxSpread = (maxHitCount - 1) / 2;
@@ -458,18 +463,26 @@ public class MyStrategy implements Strategy {
 
     private void onBulletHittingADummy(Vec2Double unitCenter, HitProbabilities hitProbabilities, DummyBullet bullet, Dummy dummy) {
         if (dummy.unit.getPlayerId() == unit.getPlayerId()) {
-            debug.draw(new CustomData.Line(vecUtil.toFloatVector(unitCenter), vecUtil.toFloatVector(bullet.position),
-                    0.05f, new ColorFloat(0, 0, 1, OLD_DEBUG_TRANSPARENCY)));
+            if (debug.isEnabled()) {
+                debug.draw(new CustomData.Line(vecUtil.toFloatVector(unitCenter), vecUtil.toFloatVector(bullet.position),
+                        0.05f, new ColorFloat(0, 0, 1, OLD_DEBUG_TRANSPARENCY)));
+            }
             hitProbabilities.allyHitCount++;
         } else {
-            debug.draw(new CustomData.Line(vecUtil.toFloatVector(unitCenter), vecUtil.toFloatVector(bullet.position),
-                    0.05f, new ColorFloat(0, 1, 0, OLD_DEBUG_TRANSPARENCY)));
+            if (debug.isEnabled()) {
+                debug.draw(new CustomData.Line(vecUtil.toFloatVector(unitCenter), vecUtil.toFloatVector(bullet.position),
+                        0.05f, new ColorFloat(0, 1, 0, OLD_DEBUG_TRANSPARENCY)));
+            }
             hitProbabilities.enemyHitCount++;
         }
     }
 
     private Tile getTile(Vec2Double location) {
         return tiles[(int) location.getX()][(int) location.getY()];
+    }
+
+    private Tile getTile(double x, double y) {
+        return tiles[(int) x][(int) y];
     }
 
     private LootBox getNearestWeapon(model.WeaponType weaponType) {
@@ -705,7 +718,7 @@ public class MyStrategy implements Strategy {
             Tile tile3 = tiles[xMinusSize][yPlusSize];
             Tile tile4 = tiles[xPlusSize][yPlusSize];
             boolean hit = tile1 == Tile.WALL || tile2 == Tile.WALL || tile3 == Tile.WALL || tile4 == Tile.WALL;
-            if (hit && trace) {
+            if (debug.isEnabled() && hit && trace) {
                 debug.draw(new CustomData.Line(vecUtil.toFloatVector(startPosition), vecUtil.toFloatVector(position), (float) size, new ColorFloat(1, 1, 1, 0.2f)));
             }
             return hit;
@@ -718,7 +731,7 @@ public class MyStrategy implements Strategy {
             Vec2Double dummyCenter = vecUtil.getCenter(dummy.getPosition(), dummy.unit.getSize());
             boolean hit = Math.abs(dummyCenter.getX() - position.getX()) <= (dummy.unit.getSize().getX() + size) / 2.0
                     && Math.abs(dummyCenter.getY() - position.getY()) <= (dummy.unit.getSize().getY() + size) / 2.0;
-            if (hit && trace) {
+            if (debug.isEnabled() && hit && trace) {
                 debug.draw(new CustomData.Line(vecUtil.toFloatVector(startPosition), vecUtil.toFloatVector(position), (float) size, new ColorFloat(0, 1, 1, 0.2f)));
             }
 
@@ -841,7 +854,7 @@ public class MyStrategy implements Strategy {
                     position = newPosition;
                 }
             }
-            if (microTick == 0 && vecUtil.length(vecUtil.substract(position, oldPosition)) > EPSILON) {
+            if (debug.isEnabled() && microTick == 0 && vecUtil.length(vecUtil.substract(position, oldPosition)) > EPSILON) {
                 debug.draw(new CustomData.Line(vecUtil.toFloatVector(oldPosition), vecUtil.toFloatVector(position), 0.05f, new ColorFloat(bulletsCaught.size() / 2.0f, 0, 1, 1)));
             }
             if (isStandingPosition(position) && /*not jumping*/(canCancelJump || canJumpForSeconds < EPSILON)) {
@@ -857,22 +870,22 @@ public class MyStrategy implements Strategy {
         }
 
         public boolean isPositionPossible(Vec2Double position) {
-            Tile tile00 = getTile(vecUtil.add(position, new Vec2Double(-halfUnitSizeX, 0.0)));
-            Tile tile10 = getTile(vecUtil.add(position, new Vec2Double(+halfUnitSizeX, 0.0)));
-            Tile tile01 = getTile(vecUtil.add(position, new Vec2Double(-halfUnitSizeX, unit.getSize().getY() / 2.0)));
-            Tile tile11 = getTile(vecUtil.add(position, new Vec2Double(+halfUnitSizeX, unit.getSize().getY() / 2.0)));
-            Tile tile02 = getTile(vecUtil.add(position, new Vec2Double(-halfUnitSizeX, unit.getSize().getY())));
-            Tile tile12 = getTile(vecUtil.add(position, new Vec2Double(+halfUnitSizeX, unit.getSize().getY())));
+            Tile tile00 = getTile(position.getX() - halfUnitSizeX, position.getY());
+            Tile tile10 = getTile(position.getX() + halfUnitSizeX, position.getY());
+            Tile tile01 = getTile(position.getX() - halfUnitSizeX, position.getY() + unit.getSize().getY() / 2.0);
+            Tile tile11 = getTile(position.getX() + halfUnitSizeX, position.getY() + unit.getSize().getY() / 2.0);
+            Tile tile02 = getTile(position.getX() - halfUnitSizeX, position.getY() + unit.getSize().getY());
+            Tile tile12 = getTile(position.getX() + halfUnitSizeX, position.getY() + unit.getSize().getY());
             return tile00 != Tile.WALL && tile10 != Tile.WALL && tile01 != Tile.WALL && tile11 != Tile.WALL && tile02 != Tile.WALL && tile12 != Tile.WALL;
         }
 
         public boolean isPositionAffectedByJumpPad(Vec2Double position) {
-            Tile tile00 = getTile(vecUtil.add(position, new Vec2Double(-halfUnitSizeX, 0.0)));
-            Tile tile10 = getTile(vecUtil.add(position, new Vec2Double(+halfUnitSizeX, 0.0)));
-            Tile tile01 = getTile(vecUtil.add(position, new Vec2Double(-halfUnitSizeX, unit.getSize().getY() / 2.0)));
-            Tile tile11 = getTile(vecUtil.add(position, new Vec2Double(+halfUnitSizeX, unit.getSize().getY() / 2.0)));
-            Tile tile02 = getTile(vecUtil.add(position, new Vec2Double(-halfUnitSizeX, unit.getSize().getY())));
-            Tile tile12 = getTile(vecUtil.add(position, new Vec2Double(+halfUnitSizeX, unit.getSize().getY())));
+            Tile tile00 = getTile(position.getX() - halfUnitSizeX, position.getY());
+            Tile tile10 = getTile(position.getX() + halfUnitSizeX, position.getY());
+            Tile tile01 = getTile(position.getX() - halfUnitSizeX, position.getY() + unit.getSize().getY() / 2.0);
+            Tile tile11 = getTile(position.getX() + halfUnitSizeX, position.getY() + unit.getSize().getY() / 2.0);
+            Tile tile02 = getTile(position.getX() - halfUnitSizeX, position.getY() + unit.getSize().getY());
+            Tile tile12 = getTile(position.getX() + halfUnitSizeX, position.getY() + unit.getSize().getY());
             return (tile00 == Tile.JUMP_PAD || tile10 == Tile.JUMP_PAD || tile01 == Tile.JUMP_PAD ||
                     tile11 == Tile.JUMP_PAD || tile02 == Tile.JUMP_PAD || tile12 == Tile.JUMP_PAD)
                     && !isPositionAffectedByLadder(position);
