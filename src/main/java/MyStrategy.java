@@ -38,7 +38,7 @@ public class MyStrategy implements Strategy {
         this.debug = debug;
         this.tiles = game.getLevel().getTiles();
 
-//        this.debug.enable();
+        this.debug.enable();
 
         UnitAction action = new UnitAction();
         action.setSwapWeapon(false);
@@ -70,15 +70,14 @@ public class MyStrategy implements Strategy {
             }
         }
         boolean jump = runningPos.getY() > unit.getPosition().getY();
-        if (runningPos.getX() > unit.getPosition().getX() && game.getLevel()
-                .getTiles()[(int) (unit.getPosition().getX() + 1)][(int) (unit.getPosition().getY())] == Tile.WALL) {
+        if (runningPos.getX() > unit.getPosition().getX() && getTile(unit.getPosition().getX() + 1, unit.getPosition().getY()) == Tile.WALL) {
             jump = true;
         }
-        if (runningPos.getX() < unit.getPosition().getX() && game.getLevel()
-                .getTiles()[(int) (unit.getPosition().getX() - 1)][(int) (unit.getPosition().getY())] == Tile.WALL) {
+        if (runningPos.getX() < unit.getPosition().getX() && getTile(unit.getPosition().getX() - 1, unit.getPosition().getY()) == Tile.WALL) {
             jump = true;
         }
 
+        runningPos = jumpPadHack(runningPos);
         setJumpAndVelocity(runningPos, jump, action);
 
         if (unit.getWeapon() != null) {
@@ -133,8 +132,6 @@ public class MyStrategy implements Strategy {
     }
 
     private void setJumpAndVelocity(Vec2Double runningPos, boolean jump, UnitAction action) {
-        jumpPadHack(runningPos);
-
         action.setVelocity(Math.signum(runningPos.getX() - unit.getPosition().getX()) * game.getProperties().getUnitMaxHorizontalSpeed());
         action.setJump(jump);
         action.setJumpDown(!jump);
@@ -291,9 +288,9 @@ public class MyStrategy implements Strategy {
 
     private Vec2Double jumpPadHack(Vec2Double runningPos) {
         if (getTile(runningPos.getX() - 1.0, runningPos.getY()) == Tile.JUMP_PAD) {
-            runningPos.setX(runningPos.getX() + 0.5);
+            return new Vec2Double(runningPos.getX() + 0.5, runningPos.getY());
         } else if (getTile(runningPos.getX() + 1.0, runningPos.getY()) == Tile.JUMP_PAD) {
-            runningPos.setX(runningPos.getX() - 0.5);
+            return new Vec2Double(runningPos.getX() - 0.5, runningPos.getY());
         }
         return runningPos;
     }
