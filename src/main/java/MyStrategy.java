@@ -25,11 +25,11 @@ public class MyStrategy implements Strategy {
     @Override
     public UnitAction getAction(Unit unit, Game game, Debug debug) {
         // TODO: 1. поиск пути между мин и врагов
+        // TODO: 5. столкновение с другими игроками
         // TODO: 2. минимальный aim
         // TODO: 3. отстрел мин
         // TODO: 4. предсказание взрывов мин
-
-//        this.debug.enable();
+        // TODO: бои вплотную сделать менее дёргарыми
 
         this.unit = unit;
         this.game = game;
@@ -38,19 +38,21 @@ public class MyStrategy implements Strategy {
         this.debug = debug;
         this.tiles = game.getLevel().getTiles();
 
+//        this.debug.enable();
+
         UnitAction action = new UnitAction();
         action.setSwapWeapon(false);
 
         Unit nearestEnemy = getNearestEnemy();
         LootBox nearestWeapon = getNearestWeapon(null);
         LootBox nearestLauncher = null;// getNearestWeapon(WeaponType.ROCKET_LAUNCHER);
-        LootBox nearestMineBox = getNearestMineBox();
+//        LootBox nearestMineBox = getNearestMineBox();
         Vec2Double runningPos = unit.getPosition();
         if (unit.getWeapon() == null && nearestWeapon != null) {
             runningPos = nearestWeapon.getPosition();
-        } else if (unit.getWeapon() != null && unit.getWeapon().getTyp() != WeaponType.ROCKET_LAUNCHER && nearestLauncher != null) {
-            runningPos = nearestLauncher.getPosition();
-            action.setSwapWeapon(true);
+//        } else if (unit.getWeapon() != null && unit.getWeapon().getTyp() != WeaponType.ROCKET_LAUNCHER && nearestLauncher != null) {
+//            runningPos = nearestLauncher.getPosition();
+//            action.setSwapWeapon(true);
         } else if (nearestEnemy != null) {
             runningPos = nearestEnemy.getPosition();
             if (unit.getHealth() < game.getProperties().getUnitMaxHealth() * HEALTH_TO_LOOK_FOR_HEAL) {
@@ -76,8 +78,6 @@ public class MyStrategy implements Strategy {
                 .getTiles()[(int) (unit.getPosition().getX() - 1)][(int) (unit.getPosition().getY())] == Tile.WALL) {
             jump = true;
         }
-
-        runningPos = jumpPadHack(runningPos);
 
         setJumpAndVelocity(runningPos, jump, action);
 
@@ -133,6 +133,8 @@ public class MyStrategy implements Strategy {
     }
 
     private void setJumpAndVelocity(Vec2Double runningPos, boolean jump, UnitAction action) {
+        jumpPadHack(runningPos);
+
         action.setVelocity(Math.signum(runningPos.getX() - unit.getPosition().getX()) * game.getProperties().getUnitMaxHorizontalSpeed());
         action.setJump(jump);
         action.setJumpDown(!jump);
@@ -363,6 +365,9 @@ public class MyStrategy implements Strategy {
         }
         Vec2Double unitCenter = vecUtil.getCenter(unit);
         int maxHitCount = Math.min(51, 1 + 2 * ((int) (180.0 * spread / Math.PI)));
+        if (debug.isEnabled()) {
+            System.out.println(maxHitCount);
+        }
         List<DummyBullet> bullets = new ArrayList<>();
         double baseAngle = vecUtil.getAngle(aim);
         int maxSpread = (maxHitCount - 1) / 2;
