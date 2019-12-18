@@ -24,12 +24,13 @@ public class MyStrategy implements Strategy {
 
     @Override
     public UnitAction getAction(Unit unit, Game game, Debug debug) {
+        // TODO: бои вплотную сделать менее дёргарыми
         // TODO: 1. поиск пути между мин и врагов
         // TODO: 5. столкновение с другими игроками
+        // TODO: научить модель прыгать по головам
         // TODO: 2. минимальный aim
         // TODO: 3. отстрел мин
         // TODO: 4. предсказание взрывов мин
-        // TODO: бои вплотную сделать менее дёргарыми
 
         this.unit = unit;
         this.game = game;
