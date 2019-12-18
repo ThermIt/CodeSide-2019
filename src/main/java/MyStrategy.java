@@ -8,7 +8,7 @@ import java.util.*;
 public class MyStrategy implements Strategy {
 
     public static final double HEALTH_TO_LOOK_FOR_HEAL = 0.90;
-    private static final double EPSILON = 0.000000000001;
+    private static final double EPSILON = 0.000000001;
     private static final float OLD_DEBUG_TRANSPARENCY = 0.2f;
     VectorUtils vecUtil = new VectorUtils();
     private Unit unit;
@@ -24,6 +24,7 @@ public class MyStrategy implements Strategy {
 
     @Override
     public UnitAction getAction(Unit unit, Game game, Debug debug) {
+        // убрать самовыпиливание на минах, сделать нормальный подрыв
         // TODO: бои вплотную сделать менее дёргарыми
         // TODO: 1. поиск пути между мин и врагов
         // TODO: 5. столкновение с другими игроками
@@ -31,6 +32,8 @@ public class MyStrategy implements Strategy {
         // TODO: 2. минимальный aim
         // TODO: 3. отстрел мин
         // TODO: 4. предсказание взрывов мин
+        // ограничить глубину просчёта пуль самым дальним юнитом+радиус взрыва пули
+        // высчитывать взрывы, кто выиграет
 
         this.unit = unit;
         this.game = game;
@@ -39,35 +42,75 @@ public class MyStrategy implements Strategy {
         this.debug = debug;
         this.tiles = game.getLevel().getTiles();
 
-        this.debug.enable();
+//        this.debug.enable();
 
         UnitAction action = new UnitAction();
         action.setSwapWeapon(false);
 
         Unit nearestEnemy = getNearestEnemy();
+        Unit nearestAlly = getNearestAlly();
+
+        boolean nearGround = unit.isOnGround() || (0 != ((int) (unit.getPosition().getY()) - (int) (unit.getPosition().getY() - 2.0 * game.getProperties().getUnitFallSpeed() / updatesPerSecond)));
+/*
+        if (debug.isEnabled() && unit.getWeapon() != null && unit.getMines() > 0) {
+            System.out.println("FIRE IN THE HOOLE!!!");
+            System.out.println(nearestAlly == null || vecUtil.linearLength(vecUtil.substract(nearestAlly.getPosition(), unit.getPosition())) > game.getProperties().getMineExplosionParams().getRadius());
+            System.out.println(nearestEnemy != null && vecUtil.linearLength(vecUtil.substract(nearestEnemy.getPosition(), unit.getPosition())) < game.getProperties().getMineExplosionParams().getRadius());
+            System.out.println(unit.getWeapon().getMagazine() > 0);
+            System.out.println(unit.getWeapon().getFireTimer() == null || unit.getWeapon().getFireTimer() < 2.0 / game.getProperties().getTicksPerSecond());
+            System.out.println(unit.getWeapon().getFireTimer() == null || unit.getWeapon().getFireTimer() < EPSILON);
+        }
+*/
+
+        if (unit.getMines() > 0
+                && (nearGround)
+                && unit.getWeapon() != null
+                && nearestEnemy != null
+                && (nearestAlly == null || vecUtil.linearLength(vecUtil.substract(nearestAlly.getPosition(), unit.getPosition())) > game.getProperties().getMineExplosionParams().getRadius())
+                && (unit.getWeapon().getFireTimer() == null || unit.getWeapon().getFireTimer() < 2.0 / game.getProperties().getTicksPerSecond())
+                && unit.getWeapon().getMagazine() > 0
+                && vecUtil.linearLength(vecUtil.substract(nearestEnemy.getPosition(), unit.getPosition())) < game.getProperties().getMineExplosionParams().getRadius()
+        ) {
+            if (debug.isEnabled()) {
+                System.out.println("FIRE IN THE HOOLE!!!");
+            }
+            action.setAim(new Vec2Double(0.0, -10.0));
+            if (unit.getWeapon().getFireTimer() == null || unit.getWeapon().getFireTimer() < EPSILON) {
+                action.setPlantMine(true);
+                action.setShoot(true);
+            }
+
+            return action;
+        }
+
         LootBox nearestWeapon = getNearestWeapon(null);
-        LootBox nearestLauncher = null;// getNearestWeapon(WeaponType.ROCKET_LAUNCHER);
-//        LootBox nearestMineBox = getNearestMineBox();
+        LootBox nearestLauncher = null; // getNearestWeapon(WeaponType.PISTOL);
+        LootBox nearestMineBox = null; // getNearestMineBox();
+        LootBox nearestHealthPack = getNearestHealthPack();
         Vec2Double runningPos = unit.getPosition();
         if (unit.getWeapon() == null && nearestWeapon != null) {
             runningPos = nearestWeapon.getPosition();
-//        } else if (unit.getWeapon() != null && unit.getWeapon().getTyp() != WeaponType.ROCKET_LAUNCHER && nearestLauncher != null) {
-//            runningPos = nearestLauncher.getPosition();
-//            action.setSwapWeapon(true);
+        } else if (unit.getWeapon() != null && unit.getWeapon().getTyp() != WeaponType.PISTOL && nearestLauncher != null) {
+            runningPos = nearestLauncher.getPosition();
+            action.setSwapWeapon(true);
+        } else if (nearestMineBox != null && unit.getMines() < 2) {
+            runningPos = nearestMineBox.getPosition();
+        } else if (unit.getHealth() < game.getProperties().getUnitMaxHealth() * HEALTH_TO_LOOK_FOR_HEAL && nearestHealthPack != null) {
+            runningPos = nearestHealthPack.getPosition();
         } else if (nearestEnemy != null) {
             runningPos = nearestEnemy.getPosition();
-            if (unit.getHealth() < game.getProperties().getUnitMaxHealth() * HEALTH_TO_LOOK_FOR_HEAL) {
-                LootBox nearestHealthPack = getNearestHealthPack();
-                if (nearestHealthPack != null) {
-                    runningPos = nearestHealthPack.getPosition();
-                }
-            }
         }
         Vec2Double aim = new Vec2Double(0, 0);
         if (nearestEnemy != null) {
-            aim = findMeanAim(nearestEnemy);
-            if (vecUtil.length(aim) < EPSILON) {
-                aim = vecUtil.substract(nearestEnemy.getPosition(), unit.getPosition());
+//            if (Math.abs(unit.getPosition().getY() - nearestEnemy.getPosition().getY()) <= game.getProperties().getUnitSize().getY() * 1.1
+//                    && Math.abs(unit.getPosition().getX() - nearestEnemy.getPosition().getX()) <= game.getProperties().getUnitSize().getX() * 1.1) {
+//                aim = vecUtil.substract(nearestEnemy.getPosition(), unit.getPosition());
+//                System.out.println("aim");
+//            } else {
+                aim = findMeanAim(nearestEnemy);
+                if (vecUtil.length(aim) < EPSILON) {
+                    aim = vecUtil.substract(nearestEnemy.getPosition(), unit.getPosition());
+//                }
             }
         }
         boolean jump = runningPos.getY() > unit.getPosition().getY();
@@ -110,6 +153,12 @@ public class MyStrategy implements Strategy {
                         action.setShoot(true);
                     }
                 }
+            } else if (unit.getWeapon().getTyp() == WeaponType.PISTOL) {
+                if (hitPNew.getEnemyHitProbability() > 0.3) {
+                    action.setShoot(true);
+                } else {
+                    System.out.println(unit.getWeapon().getFireTimer() + " " + hitPNew.getEnemyHitProbability());
+                }
             } else if (hitPNew.getEnemyHitProbability() > 0.05) {
                 action.setShoot(true);
             }
@@ -122,8 +171,6 @@ public class MyStrategy implements Strategy {
             action.setShoot(false);
             action.setAim(vecUtil.normalize(aim, 10.0));
         }
-
-        action.setPlantMine(nearestEnemy != null && vecUtil.length(vecUtil.substract(nearestEnemy.getPosition(), unit.getPosition())) < game.getProperties().getMineExplosionParams().getRadius());
 
         if (debug.isEnabled()) {
             System.out.println("" + game.getCurrentTick() + ":" + unit.getId() + ":" + action + ":" + unit.getWeapon());
@@ -362,7 +409,7 @@ public class MyStrategy implements Strategy {
             return HitProbabilities.EMPTY;
         }
         Vec2Double unitCenter = vecUtil.getCenter(unit);
-        int maxHitCount = Math.min(51, 1 + 2 * ((int) (180.0 * spread / Math.PI)));
+        int maxHitCount = Math.max(5, Math.min(51, 1 + 2 * ((int) (180.0 * spread / Math.PI))));
         if (debug.isEnabled()) {
             System.out.println(maxHitCount);
         }
@@ -540,6 +587,19 @@ public class MyStrategy implements Strategy {
             }
         }
         return nearestEnemy;
+    }
+
+    private Unit getNearestAlly() {
+        Unit nearestAlly = null;
+        for (Unit other : game.getUnits()) {
+            if (other.getPlayerId() == unit.getPlayerId() && unit.getId() != other.getId()) {
+                if (nearestAlly == null || distanceSqr(unit.getPosition(),
+                        other.getPosition()) < distanceSqr(unit.getPosition(), nearestAlly.getPosition())) {
+                    nearestAlly = other;
+                }
+            }
+        }
+        return nearestAlly;
     }
 
     static class HitProbabilities {

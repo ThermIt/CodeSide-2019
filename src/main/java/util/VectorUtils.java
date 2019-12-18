@@ -57,6 +57,10 @@ public class VectorUtils {
         return Math.sqrt(vector.getX() * vector.getX() + vector.getY() * vector.getY());
     }
 
+    public double linearLength(Vec2Double vector) {
+        return Math.max(Math.abs(vector.getX()), Math.abs(vector.getY()));
+    }
+
     public double length(Vec2Double vector1, Vec2Double vector2) {
         double x = vector1.getX() - vector2.getX();
         double y = vector1.getY() - vector2.getY();
