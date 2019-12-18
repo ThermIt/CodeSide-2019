@@ -110,8 +110,8 @@ public class MyStrategy implements Strategy {
                 aim = findMeanAim(nearestEnemy);
                 if (vecUtil.length(aim) < EPSILON) {
                     aim = vecUtil.substract(nearestEnemy.getPosition(), unit.getPosition());
-//                }
-            }
+                }
+//            }
         }
         boolean jump = runningPos.getY() > unit.getPosition().getY();
         if (runningPos.getX() > unit.getPosition().getX() && getTile(unit.getPosition().getX() + 1, unit.getPosition().getY()) == Tile.WALL) {
@@ -153,12 +153,12 @@ public class MyStrategy implements Strategy {
                         action.setShoot(true);
                     }
                 }
-            } else if (unit.getWeapon().getTyp() == WeaponType.PISTOL) {
-                if (hitPNew.getEnemyHitProbability() > 0.3) {
-                    action.setShoot(true);
-                } else {
-                    System.out.println(unit.getWeapon().getFireTimer() + " " + hitPNew.getEnemyHitProbability());
-                }
+//            } else if (unit.getWeapon().getTyp() == WeaponType.PISTOL) {
+//                if (hitPNew.getEnemyHitProbability() > 0.3) {
+//                    action.setShoot(true);
+//                } else {
+//                    System.out.println(unit.getWeapon().getFireTimer() + " " + hitPNew.getEnemyHitProbability());
+//                }
             } else if (hitPNew.getEnemyHitProbability() > 0.05) {
                 action.setShoot(true);
             }
