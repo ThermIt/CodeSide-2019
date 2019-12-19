@@ -65,6 +65,7 @@ public class MyStrategy implements Strategy {
         // разделение коробок между своими
         // ограничить глубину просчёта пуль самым дальним юнитом+радиус взрыва пули
         // высчитывать взрывы, кто выиграет
+        // не стрелять первым вплотную из ракетницы если я из-за этого проиграю
 
         this.unit = unit;
         this.game = game;
@@ -190,13 +191,19 @@ public class MyStrategy implements Strategy {
             }
             if (hitPNew.getEnemyHitProbability() - hitPOld.getEnemyHitProbability() >= 0.02 || unit.getWeapon() == null || unit.getWeapon().getLastAngle() == null) {
                 action.setAim(vecUtil.normalize(aim, 10.0));
+                debug.draw(new CustomData.Rect(unit.getPosition().toFloatVector(), new Vec2Float(0.3f, 0.3f), new ColorFloat(1f,0f,0f,1f)));
+                debug.draw(new CustomData.Rect(vecUtil.add(unit.getPosition(), vecUtil.normalize(aim, 10.0)).toFloatVector(), new Vec2Float(0.3f, 0.3f), new ColorFloat(1f,0f,0f,1f)));
             } else {
                 hitPNew = hitPOld;
                 Vec2Double lastAim = vecUtil.fromAngle(unit.getWeapon().getLastAngle(), 10.0);
                 if (vecUtil.angleBetween(aim, lastAim) < Math.PI / 4.0) {
                     action.setAim(lastAim);
+                    debug.draw(new CustomData.Rect(unit.getPosition().toFloatVector(), new Vec2Float(0.3f, 0.3f), new ColorFloat(0f,1f,0f,1f)));
+                    debug.draw(new CustomData.Rect(vecUtil.add(unit.getPosition(), lastAim).toFloatVector(), new Vec2Float(0.3f, 0.3f), new ColorFloat(0f,1f,0f,1f)));
                 } else {
                     action.setAim(vecUtil.normalize(aim, 10.0));
+                    debug.draw(new CustomData.Rect(unit.getPosition().toFloatVector(), new Vec2Float(0.3f, 0.3f), new ColorFloat(0f,0f,1f,1f)));
+                    debug.draw(new CustomData.Rect(vecUtil.add(unit.getPosition(), vecUtil.normalize(aim, 10.0)).toFloatVector(), new Vec2Float(0.3f, 0.3f), new ColorFloat(0f,0f,1f,1f)));
                 }
             }
             if (unit.getWeapon().getTyp() == WeaponType.ROCKET_LAUNCHER) {
@@ -449,7 +456,7 @@ public class MyStrategy implements Strategy {
                 bullet.moveOneUpdateVertically();
                 if (bullet.isHittingTheDummy(enemyDummy)) {
                     if (debug.isEnabled()) {
-                        debug.draw(new CustomData.Line(vecUtil.toFloatVector(unitCenter), vecUtil.toFloatVector(bullet.position),
+                        debug.draw(new CustomData.Line(unitCenter.toFloatVector(), bullet.position.toFloatVector(),
                                 0.05f, new ColorFloat(0, 1, 1, 0.1f)));
                     }
                     iterator.remove();
@@ -458,13 +465,13 @@ public class MyStrategy implements Strategy {
                 } else if (bullet.isHittingAWall()) {
                     if (bullet.isHittingTheDummyWithExplosion(enemyDummy)) {
                         if (debug.isEnabled()) {
-                            debug.draw(new CustomData.Line(vecUtil.toFloatVector(unitCenter), vecUtil.toFloatVector(bullet.position),
+                            debug.draw(new CustomData.Line(unitCenter.toFloatVector(), bullet.position.toFloatVector(),
                                     0.05f, new ColorFloat(0, 1, 1, 0.1f)));
                         }
                         hitCount++;
                         hitVector = vecUtil.add(bullet.position, hitVector);
                     } else if (debug.isEnabled()) {
-                        debug.draw(new CustomData.Line(vecUtil.toFloatVector(unitCenter), vecUtil.toFloatVector(bullet.position),
+                        debug.draw(new CustomData.Line(unitCenter.toFloatVector(), bullet.position.toFloatVector(),
                                 0.05f, new ColorFloat(1, 0, 1, OLD_DEBUG_TRANSPARENCY)));
                     }
                     iterator.remove();
@@ -604,13 +611,13 @@ public class MyStrategy implements Strategy {
     private void onBulletHittingADummy(Vec2Double unitCenter, HitProbabilities hitProbabilities, DummyBullet bullet, Dummy dummy) {
         if (dummy.unit.getPlayerId() == unit.getPlayerId()) {
             if (debug.isEnabled()) {
-                debug.draw(new CustomData.Line(vecUtil.toFloatVector(unitCenter), vecUtil.toFloatVector(bullet.position),
+                debug.draw(new CustomData.Line(unitCenter.toFloatVector(), bullet.position.toFloatVector(),
                         0.05f, new ColorFloat(0, 0, 1, OLD_DEBUG_TRANSPARENCY)));
             }
             hitProbabilities.allyHitCount++;
         } else {
             if (debug.isEnabled()) {
-                debug.draw(new CustomData.Line(vecUtil.toFloatVector(unitCenter), vecUtil.toFloatVector(bullet.position),
+                debug.draw(new CustomData.Line(unitCenter.toFloatVector(), bullet.position.toFloatVector(),
                         0.05f, new ColorFloat(0, 1, 0, OLD_DEBUG_TRANSPARENCY)));
             }
             hitProbabilities.enemyHitCount++;
@@ -886,7 +893,7 @@ public class MyStrategy implements Strategy {
             Tile tile4 = tiles[xPlusSize][yPlusSize];
             boolean hit = tile1 == Tile.WALL || tile2 == Tile.WALL || tile3 == Tile.WALL || tile4 == Tile.WALL;
             if (debug.isEnabled() && hit && trace) {
-                debug.draw(new CustomData.Line(vecUtil.toFloatVector(startPosition), vecUtil.toFloatVector(position), (float) size, new ColorFloat(1, 1, 1, 0.2f)));
+                debug.draw(new CustomData.Line(startPosition.toFloatVector(), position.toFloatVector(), (float) size, new ColorFloat(1, 1, 1, 0.2f)));
             }
             return hit;
         }
@@ -899,7 +906,7 @@ public class MyStrategy implements Strategy {
             boolean hit = Math.abs(dummyCenter.getX() - position.getX()) <= (dummy.unit.getSize().getX() + size) / 2.0
                     && Math.abs(dummyCenter.getY() - position.getY()) <= (dummy.unit.getSize().getY() + size) / 2.0;
             if (debug.isEnabled() && hit && trace) {
-                debug.draw(new CustomData.Line(vecUtil.toFloatVector(startPosition), vecUtil.toFloatVector(position), (float) size, new ColorFloat(0, 1, 1, 0.2f)));
+                debug.draw(new CustomData.Line(startPosition.toFloatVector(), position.toFloatVector(), (float) size, new ColorFloat(0, 1, 1, 0.2f)));
             }
 
             return hit;
@@ -1033,7 +1040,7 @@ public class MyStrategy implements Strategy {
                 }
             }
             if (debug.isEnabled() && microTick == 0 && vecUtil.length(vecUtil.substract(position, oldPosition)) > EPSILON) {
-                debug.draw(new CustomData.Line(vecUtil.toFloatVector(oldPosition), vecUtil.toFloatVector(position), 0.05f, new ColorFloat(bulletsCaught.size() / 2.0f, 0, 1, 1)));
+                debug.draw(new CustomData.Line(oldPosition.toFloatVector(), position.toFloatVector(), 0.05f, new ColorFloat(bulletsCaught.size() / 2.0f, 0, 1, 1)));
             }
             if (isStandingPosition(position) && /*not jumping*/(canCancelJump || canJumpForSeconds < EPSILON)) {
                 canCancelJump = true;

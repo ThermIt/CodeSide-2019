@@ -13,10 +13,6 @@ public class VectorUtils {
         return new Vec2Double(from.getX(), from.getY());
     }
 
-    public Vec2Float toFloatVector(Vec2Double from) {
-        return new Vec2Float((float) from.getX(), (float) from.getY());
-    }
-
     public Vec2Float toFloatVector(Vec2Double from, Vec2Double plus, float scale) {
         return new Vec2Float((float) (from.getX() + plus.getX() * scale), (float) (from.getY() + plus.getY() * scale));
     }
@@ -97,7 +93,7 @@ public class VectorUtils {
 
     public double angleBetween(Vec2Double vector1, Vec2Double vector2) {
         double d = (vector1.getX() * vector2.getX() + vector1.getY() * vector2.getY()) / (length(vector1) * length(vector2));
-        return StrictMath.acos(d) / Math.PI * 180.0;
+        return StrictMath.acos(d);
     }
 
 }
