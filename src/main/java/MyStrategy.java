@@ -17,6 +17,8 @@ public class MyStrategy implements Strategy {
     private double updatesPerSecond;
     private double halfUnitSizeX;
     private Tile[][] tiles;
+    private Player me;
+    private Player enemy;
 
     static double distanceSqr(Vec2Double a, Vec2Double b) {
         return (a.getX() - b.getX()) * (a.getX() - b.getX()) + (a.getY() - b.getY()) * (a.getY() - b.getY());
@@ -32,6 +34,7 @@ public class MyStrategy implements Strategy {
         // TODO: 2. минимальный aim
         // TODO: 3. отстрел мин
         // TODO: 4. предсказание взрывов мин
+        // разделение коробок между своими
         // ограничить глубину просчёта пуль самым дальним юнитом+радиус взрыва пули
         // высчитывать взрывы, кто выиграет
 
@@ -42,7 +45,15 @@ public class MyStrategy implements Strategy {
         this.debug = debug;
         this.tiles = game.getLevel().getTiles();
 
-//        this.debug.enable();
+        if (game.getPlayers()[0].getId() == unit.getPlayerId()) {
+            me = game.getPlayers()[0];
+            enemy = game.getPlayers()[1];
+        } else {
+            me = game.getPlayers()[1];
+            enemy = game.getPlayers()[0];
+        }
+
+        this.debug.enable();
 
         UnitAction action = new UnitAction();
         action.setSwapWeapon(false);
@@ -50,38 +61,48 @@ public class MyStrategy implements Strategy {
         Unit nearestEnemy = getNearestEnemy();
         Unit nearestAlly = getNearestAlly();
 
-        boolean nearGround = unit.isOnGround() || (0 != ((int) (unit.getPosition().getY()) - (int) (unit.getPosition().getY() - 2.0 * game.getProperties().getUnitFallSpeed() / updatesPerSecond)));
+//        boolean nearGround = unit.isOnGround() || (0 != ((int) (unit.getPosition().getY()) - (int) (unit.getPosition().getY() - 2.0 * game.getProperties().getUnitFallSpeed() / updatesPerSecond)));
+
+        if (unit.getMines() > 0) {
+            Set<Unit> unitsInMineRadius = getUnitsInMineRadius();
+            double damageToMy = 0.0;
+            double damageToEnemy = 0.0;
+            for (Unit someUnit : unitsInMineRadius) {
+                double damage = Math.min(game.getProperties().getMineExplosionParams().getDamage(), someUnit.getHealth());
+                if (me.getId() == someUnit.getPlayerId()) {
+                    damageToMy += damage;
+                } else {
+                    damageToEnemy += damage;
+                }
+            }
+
+            if (me.getScore() + damageToEnemy > enemy.getScore() || damageToEnemy > damageToMy) {
+                action.setPlantMine(true);
+            }
+        }
 /*
-        if (debug.isEnabled() && unit.getWeapon() != null && unit.getMines() > 0) {
-            System.out.println("FIRE IN THE HOOLE!!!");
-            System.out.println(nearestAlly == null || vecUtil.linearLength(vecUtil.substract(nearestAlly.getPosition(), unit.getPosition())) > game.getProperties().getMineExplosionParams().getRadius());
-            System.out.println(nearestEnemy != null && vecUtil.linearLength(vecUtil.substract(nearestEnemy.getPosition(), unit.getPosition())) < game.getProperties().getMineExplosionParams().getRadius());
-            System.out.println(unit.getWeapon().getMagazine() > 0);
-            System.out.println(unit.getWeapon().getFireTimer() == null || unit.getWeapon().getFireTimer() < 2.0 / game.getProperties().getTicksPerSecond());
-            System.out.println(unit.getWeapon().getFireTimer() == null || unit.getWeapon().getFireTimer() < EPSILON);
+        if (unitsInMineRadius.size() > 1) {
+                    && (nearGround)
+//                && unit.getWeapon() != null
+                    && nearestEnemy != null
+                    && (nearestAlly == null || vecUtil.linearLength(vecUtil.substract(nearestAlly.getPosition(), unit.getPosition())) > game.getProperties().getMineExplosionParams().getRadius())
+//                && (unit.getWeapon().getFireTimer() == null || unit.getWeapon().getFireTimer() < 2.0 / game.getProperties().getTicksPerSecond())
+//                && unit.getWeapon().getMagazine() > 0
+                    && vecUtil.linearLength(vecUtil.substract(nearestEnemy.getPosition(), unit.getPosition())) < game.getProperties().getMineExplosionParams().getRadius()
+            ) {
+//            if (debug.isEnabled()) {
+//                System.out.println("FIRE IN THE HOOLE!!!");
+//            }
+//            action.setAim(new Vec2Double(0.0, -10.0));
+                if (unit.getWeapon().getFireTimer() == null || unit.getWeapon().getFireTimer() < EPSILON) {
+                    action.setPlantMine(true);
+//                action.setShoot(true);
+                }
+
+//            return action;
+            }
         }
 */
-
-        if (unit.getMines() > 0
-                && (nearGround)
-                && unit.getWeapon() != null
-                && nearestEnemy != null
-                && (nearestAlly == null || vecUtil.linearLength(vecUtil.substract(nearestAlly.getPosition(), unit.getPosition())) > game.getProperties().getMineExplosionParams().getRadius())
-                && (unit.getWeapon().getFireTimer() == null || unit.getWeapon().getFireTimer() < 2.0 / game.getProperties().getTicksPerSecond())
-                && unit.getWeapon().getMagazine() > 0
-                && vecUtil.linearLength(vecUtil.substract(nearestEnemy.getPosition(), unit.getPosition())) < game.getProperties().getMineExplosionParams().getRadius()
-        ) {
-            if (debug.isEnabled()) {
-                System.out.println("FIRE IN THE HOOLE!!!");
-            }
-            action.setAim(new Vec2Double(0.0, -10.0));
-            if (unit.getWeapon().getFireTimer() == null || unit.getWeapon().getFireTimer() < EPSILON) {
-                action.setPlantMine(true);
-                action.setShoot(true);
-            }
-
-            return action;
-        }
 
         LootBox nearestWeapon = getNearestWeapon(null);
         LootBox nearestLauncher = null; // getNearestWeapon(WeaponType.PISTOL);
@@ -107,10 +128,10 @@ public class MyStrategy implements Strategy {
 //                aim = vecUtil.substract(nearestEnemy.getPosition(), unit.getPosition());
 //                System.out.println("aim");
 //            } else {
-                aim = findMeanAim(nearestEnemy);
-                if (vecUtil.length(aim) < EPSILON) {
-                    aim = vecUtil.substract(nearestEnemy.getPosition(), unit.getPosition());
-                }
+            aim = findMeanAim(nearestEnemy);
+            if (vecUtil.length(aim) < EPSILON) {
+                aim = vecUtil.substract(nearestEnemy.getPosition(), unit.getPosition());
+            }
 //            }
         }
         boolean jump = runningPos.getY() > unit.getPosition().getY();
@@ -179,6 +200,20 @@ public class MyStrategy implements Strategy {
         return action;
     }
 
+    private Set<Unit> getUnitsInMineRadius() {
+        Vec2Double position = vecUtil.add(unit.getPosition(), new Vec2Double(0, game.getProperties().getMineSize().getY() / 2.0));
+        Set<Unit> units = new HashSet<>();
+        for (Unit other : game.getUnits()) {
+            Vec2Double otherCenter = vecUtil.getCenter(other.getPosition(), other.getSize());
+
+            if (Math.abs(otherCenter.getX() - position.getX()) <= (other.getSize().getX() / 2.0 + game.getProperties().getMineExplosionParams().getRadius() - game.getProperties().getUnitMaxHorizontalSpeed())
+                    && Math.abs(otherCenter.getY() - position.getY()) <= (other.getSize().getY() / 2.0 + game.getProperties().getMineExplosionParams().getRadius()) - game.getProperties().getUnitMaxHorizontalSpeed()) {
+                units.add(other);
+            }
+        }
+        return units;
+    }
+
     private void setJumpAndVelocity(Vec2Double runningPos, boolean jump, UnitAction action) {
         action.setVelocity(Math.signum(runningPos.getX() - unit.getPosition().getX()) * game.getProperties().getUnitMaxHorizontalSpeed());
         action.setJump(jump);
@@ -208,7 +243,7 @@ public class MyStrategy implements Strategy {
             return;
         }
 
-
+        Dummy[] allDummies = createAllDummies();
         Set<Dummy> dummies = new HashSet<>();
         dummies.add(new Dummy(unit, new DummyStrat()));
         dummies.add(new Dummy(unit, new LeftJumpingStrat()));
@@ -220,6 +255,13 @@ public class MyStrategy implements Strategy {
         dummies.add(new Dummy(unit, new JumpingStrat()));
         dummies.add(new Dummy(unit, new FallingStrat()));
         dummies.add(new Dummy(unit, new AbortJumpAndThenJumpStrat()));
+
+        for (Dummy dummy : dummies) {
+            dummy.setOtherDummies(allDummies);
+        }
+        for (Dummy dummy : dummies) {
+            dummy.isPositionPossible(dummy.position);
+        }
         Set<Dummy> lastDead = new HashSet<>();
         int lastDeadTick = 0;
         Set<Dummy> survivors = new HashSet<>(dummies);
@@ -253,7 +295,7 @@ public class MyStrategy implements Strategy {
                     }
                 }
                 for (Dummy dummy : dummies) {
-                    dummy.moveOneUpdateVerically();
+                    dummy.moveOneUpdateVertically();
                     lastDeadTick = checkBulletsCollisions(bullets, lastDead, lastDeadTick, survivors, tick, dummy);
                 }
             }
@@ -362,7 +404,10 @@ public class MyStrategy implements Strategy {
             DummyBullet dummyBullet = new DummyBullet(unit.getWeapon().getParams().getBullet(), unit.getWeapon().getParams().getExplosion(), unitCenter, adjustedDirection, unit.getId());
             bullets.add(dummyBullet);
         }
-        Dummy enemyDummy = new Dummy(enemy);
+
+        Dummy[] dummies = createAllDummies();
+        Dummy enemyDummy = Arrays.stream(dummies).filter(dummy -> dummy.unit.getId() == enemy.getId()).findFirst().get();
+
         Vec2Double hitVector = new Vec2Double(0, 0);
         while (bullets.size() > 0) {
             for (Iterator<DummyBullet> iterator = bullets.iterator(); iterator.hasNext(); ) {
@@ -378,7 +423,7 @@ public class MyStrategy implements Strategy {
                     hitCount++;
                     hitVector = vecUtil.add(bullet.position, hitVector);
                 } else if (bullet.isHittingAWall()) {
-                    if (bullet.isHittingTheDummy(enemyDummy)) {
+                    if (bullet.isHittingTheDummyWithExplosion(enemyDummy)) {
                         if (debug.isEnabled()) {
                             debug.draw(new CustomData.Line(vecUtil.toFloatVector(unitCenter), vecUtil.toFloatVector(bullet.position),
                                     0.05f, new ColorFloat(0, 1, 1, 0.1f)));
@@ -393,12 +438,24 @@ public class MyStrategy implements Strategy {
                 }
             }
             enemyDummy.moveOneUpdateHorizontally();
-            enemyDummy.moveOneUpdateVerically();
+            enemyDummy.moveOneUpdateVertically();
         }
         if (hitCount == 0) {
             return new Vec2Double(0.0, 0.0);
         }
         return vecUtil.substract(vecUtil.scale(hitVector, 1.0 / (double) hitCount), unitCenter);
+    }
+
+    private Dummy[] createAllDummies() {
+        Dummy[] dummies = new Dummy[game.getUnits().length];
+        Unit[] units = game.getUnits();
+        for (int i = 0; i < units.length; i++) {
+            Unit unit = units[i];
+            Dummy dummy = new Dummy(unit);
+            dummies[i] = dummy;
+            dummy.setOtherDummies(dummies);
+        }
+        return dummies;
     }
 
     private HitProbabilities hitProbability(Vec2Double aim, double spread) {
@@ -478,7 +535,7 @@ public class MyStrategy implements Strategy {
                 }
             }
             for (Dummy dummy : dummies) {
-                dummy.moveOneUpdateVerically();
+                dummy.moveOneUpdateVertically();
                 for (Iterator<DummyBullet> iterator = bullets.iterator(); iterator.hasNext(); ) {
                     DummyBullet bullet = iterator.next();
                     if (bullet.isHittingTheDummy(dummy)) {
@@ -771,6 +828,18 @@ public class MyStrategy implements Strategy {
             return position;
         }
 
+        public Mine isHittingAMine() {
+            Mine[] mines = game.getMines();
+            for (int i = 0; i < mines.length; i++) {
+                Mine mine = mines[i];
+                Vec2Double distance = vecUtil.substract(mine.getPosition(), position);
+                if (Math.abs(distance.getX()) <= mine.getSize().getX() + size / 2.0 && Math.abs(distance.getY()) <= mine.getSize().getY() + size / 2.0) {
+                    return mine;
+                }
+            }
+            return null;
+        }
+
         public boolean isHittingAWall() {
             int xMinusSize = (int) (position.getX() - size / 2.0);
             int xPlusSize = (int) (position.getX() + size / 2.0);
@@ -803,10 +872,9 @@ public class MyStrategy implements Strategy {
 
         public boolean isHittingTheDummyWithExplosion(Dummy dummy) {
             Vec2Double dummyCenter = vecUtil.getCenter(dummy.getPosition(), dummy.unit.getSize());
-            boolean hit = Math.abs(dummyCenter.getX() - position.getX()) <= (dummy.unit.getSize().getX() / 2.0 + explosionRadius)
-                    && Math.abs(dummyCenter.getY() - position.getY()) <= (dummy.unit.getSize().getY() / 2.0 + explosionRadius);
 
-            return hit;
+            return Math.abs(dummyCenter.getX() - position.getX()) <= (dummy.unit.getSize().getX() / 2.0 + explosionRadius)
+                    && Math.abs(dummyCenter.getY() - position.getY()) <= (dummy.unit.getSize().getY() / 2.0 + explosionRadius);
         }
     }
 
@@ -823,6 +891,7 @@ public class MyStrategy implements Strategy {
         private boolean jumpingUp;
         private boolean jumpingDown;
         private Vec2Double oldPosition;
+        private Dummy[] otherDummies = new Dummy[0];
 
         public Dummy(Unit unit, DummyStrat strat) {
             this(unit);
@@ -844,7 +913,18 @@ public class MyStrategy implements Strategy {
 */
         }
 
-        public boolean isHittingTheDummy(Dummy dummy) {
+        public Dummy[] getOtherDummies() {
+            return otherDummies;
+        }
+
+        public void setOtherDummies(Dummy[] otherDummies) {
+            this.otherDummies = otherDummies;
+        }
+
+        public boolean isHittingTheDummy(Dummy dummy, Vec2Double position) {
+            if (dummy.unit.getId() == unit.getId()) {
+                return false;
+            }
             return Math.abs(dummy.getPosition().getX() - position.getX()) <= dummy.unit.getSize().getX()
                     && Math.abs(dummy.getPosition().getY() - position.getY()) <= dummy.unit.getSize().getY();
         }
@@ -883,7 +963,7 @@ public class MyStrategy implements Strategy {
             }
         }
 
-        public void moveOneUpdateVerically() {
+        public void moveOneUpdateVertically() {
             boolean isFalling = true;
             if (isPositionAffectedByLadder(position)) {
                 isFalling = false;
@@ -911,7 +991,7 @@ public class MyStrategy implements Strategy {
                     canJumpForSeconds -= 1.0 / updatesPerSecond;
                 }
             }
-            if (isFalling && (!isStandingPosition(position) || jumpingDown)) {
+            if ((isFalling && !isStandingPosition(position)) || jumpingDown) {
                 Vec2Double newPosition = vecUtil.add(position, new Vec2Double(0, -game.getProperties().getUnitFallSpeed() / updatesPerSecond));
                 if (isPositionPossible(newPosition)) {
                     position = newPosition;
@@ -933,6 +1013,11 @@ public class MyStrategy implements Strategy {
         }
 
         public boolean isPositionPossible(Vec2Double position) {
+            for (Dummy other : otherDummies) {
+                if (isHittingTheDummy(other, position)) {
+                    return false;
+                }
+            }
             Tile tile00 = getTile(position.getX() - halfUnitSizeX, position.getY());
             Tile tile10 = getTile(position.getX() + halfUnitSizeX, position.getY());
             Tile tile01 = getTile(position.getX() - halfUnitSizeX, position.getY() + unit.getSize().getY() / 2.0);
