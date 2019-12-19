@@ -252,10 +252,10 @@ public class MyStrategy implements Strategy {
         action.setJump(jump);
         action.setJumpDown(!jump);
 
-        neoAddon(runningPos, action);
+        neoAddon(runningPos, action, 100);
     }
 
-    private void neoAddon(Vec2Double runningPos, UnitAction action) {
+    private void neoAddon(Vec2Double runningPos, UnitAction action, int depth) {
 
         if (game.getBullets().length == 0) {
             return;
@@ -299,7 +299,7 @@ public class MyStrategy implements Strategy {
         int lastDeadTick = 0;
         Set<Dummy> survivors = new HashSet<>(dummies);
 
-        for (int tick = 0; tick < 100; tick++) {
+        for (int tick = 0; tick < depth; tick++) {
             dummies = new HashSet<>(survivors); // hack optimization
             for (int j = 0; j < game.getProperties().getUpdatesPerTick(); j++) {
                 for (Iterator<DummyBullet> iterator = bullets.iterator(); iterator.hasNext(); ) {
