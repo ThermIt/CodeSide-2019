@@ -10,6 +10,9 @@ public class MyStrategy implements Strategy {
     public static final double HEALTH_TO_LOOK_FOR_HEAL = 0.90;
     private static final double EPSILON = 0.000000001;
     private static final float OLD_DEBUG_TRANSPARENCY = 0.2f;
+
+    private static LootBox willTakeThis;
+
     VectorUtils vecUtil = new VectorUtils();
     private Unit unit;
     private Game game;
@@ -20,8 +23,33 @@ public class MyStrategy implements Strategy {
     private Player me;
     private Player enemy;
 
+
     static double distanceSqr(Vec2Double a, Vec2Double b) {
         return (a.getX() - b.getX()) * (a.getX() - b.getX()) + (a.getY() - b.getY()) * (a.getY() - b.getY());
+    }
+
+
+    double[][] getField(Vec2Double runningPos) {
+        int myX = (int) unit.getPosition().getX();
+        int myY = (int) unit.getPosition().getY();
+
+        int sizeX = tiles.length;
+        int sizeY = tiles[0].length;
+        double[][] field = new double[sizeX][sizeY];
+        for (int x = 0; x < sizeX; x++) {
+            for (int y = 0; y < sizeY; y++) {
+                if (y == sizeY - 1) {
+                    field[x][y] = -1;
+                }
+                if (tiles[x][y] == Tile.WALL) {
+                    field[x][y] = -1;
+                    if (y > 0) {
+                        field[x][y - 1] = -1;
+                    }
+                }
+            }
+        }
+        return field;
     }
 
     @Override
@@ -53,7 +81,7 @@ public class MyStrategy implements Strategy {
             enemy = game.getPlayers()[0];
         }
 
-        this.debug.enable();
+//        this.debug.enable();
 
         UnitAction action = new UnitAction();
         action.setSwapWeapon(false);
@@ -76,8 +104,10 @@ public class MyStrategy implements Strategy {
                 }
             }
 
-            if (me.getScore() + damageToEnemy > enemy.getScore() || damageToEnemy > damageToMy) {
-                action.setPlantMine(true);
+            if (damageToEnemy > 0) {
+                if (/*me.getScore() + damageToEnemy > enemy.getScore() || */damageToEnemy > damageToMy) {
+                    action.setPlantMine(true);
+                }
             }
         }
 /*
@@ -105,11 +135,14 @@ public class MyStrategy implements Strategy {
 */
 
         LootBox nearestWeapon = getNearestWeapon(null);
+        willTakeThis = null; // reset every tick
         LootBox nearestLauncher = null; // getNearestWeapon(WeaponType.PISTOL);
         LootBox nearestMineBox = null; // getNearestMineBox();
         LootBox nearestHealthPack = getNearestHealthPack();
         Vec2Double runningPos = unit.getPosition();
         if (unit.getWeapon() == null && nearestWeapon != null) {
+            willTakeThis = nearestWeapon;
+
             runningPos = nearestWeapon.getPosition();
         } else if (unit.getWeapon() != null && unit.getWeapon().getTyp() != WeaponType.PISTOL && nearestLauncher != null) {
             runningPos = nearestLauncher.getPosition();
@@ -599,7 +632,9 @@ public class MyStrategy implements Strategy {
                 if (weaponType == null || weaponType == ((Item.Weapon) lootBox.getItem()).getWeaponType()) {
                     if (nearestWeapon == null || distanceSqr(unit.getPosition(),
                             lootBox.getPosition()) < distanceSqr(unit.getPosition(), nearestWeapon.getPosition())) {
-                        nearestWeapon = lootBox;
+                        if (willTakeThis == null || !willTakeThis.getPosition().equals(lootBox.getPosition())) {
+                            nearestWeapon = lootBox;
+                        }
                     }
                 }
             }

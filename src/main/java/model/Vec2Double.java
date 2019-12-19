@@ -2,6 +2,8 @@ package model;
 
 import util.StreamUtil;
 
+import java.util.Objects;
+
 public class Vec2Double {
     private double x;
     public double getX() { return x; }
@@ -31,5 +33,23 @@ public class Vec2Double {
                 "x=" + x +
                 ", y=" + y +
                 '}';
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        Vec2Double that = (Vec2Double) o;
+        return Double.compare(that.x, x) == 0 &&
+                Double.compare(that.y, y) == 0;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(x, y);
     }
 }

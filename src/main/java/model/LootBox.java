@@ -1,7 +1,5 @@
 package model;
 
-import util.StreamUtil;
-
 public class LootBox {
     private model.Vec2Double position;
     public model.Vec2Double getPosition() { return position; }
