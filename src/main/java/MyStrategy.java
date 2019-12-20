@@ -12,6 +12,7 @@ public class MyStrategy implements Strategy {
     private static final float OLD_DEBUG_TRANSPARENCY = 0.2f;
 
     private static LootBox willTakeThis;
+    private static int willTakeUnitId = -1;
 
     VectorUtils vecUtil = new VectorUtils();
     private Unit unit;
@@ -137,12 +138,15 @@ public class MyStrategy implements Strategy {
 
         LootBox nearestWeapon = getNearestWeapon(null);
         willTakeThis = null; // reset every tick
+        willTakeUnitId = -1;
         LootBox nearestLauncher = null; // getNearestWeapon(WeaponType.PISTOL);
         LootBox nearestMineBox = null; // getNearestMineBox();
         LootBox nearestHealthPack = getNearestHealthPack();
         Vec2Double runningPos = unit.getPosition();
         if (unit.getWeapon() == null && nearestWeapon != null) {
             willTakeThis = nearestWeapon;
+            willTakeUnitId = unit.getId();
+            debug.draw(new CustomData.Rect(nearestWeapon.getPosition().toFloatVector(), new Vec2Float(1f, 1f), new ColorFloat(0.5f,1f,0f,0.2f)));
 
             runningPos = nearestWeapon.getPosition();
         } else if (unit.getWeapon() != null && unit.getWeapon().getTyp() != WeaponType.PISTOL && nearestLauncher != null) {
@@ -639,7 +643,7 @@ public class MyStrategy implements Strategy {
                 if (weaponType == null || weaponType == ((Item.Weapon) lootBox.getItem()).getWeaponType()) {
                     if (nearestWeapon == null || distanceSqr(unit.getPosition(),
                             lootBox.getPosition()) < distanceSqr(unit.getPosition(), nearestWeapon.getPosition())) {
-                        if (willTakeThis == null || !willTakeThis.getPosition().equals(lootBox.getPosition())) {
+                        if (willTakeUnitId == unit.getId() || willTakeThis == null || !willTakeThis.getPosition().equals(lootBox.getPosition())) {
                             nearestWeapon = lootBox;
                         }
                     }
