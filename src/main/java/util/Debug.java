@@ -4,24 +4,41 @@ import java.io.IOException;
 import java.io.OutputStream;
 
 public class Debug {
-    private OutputStream stream;
 
-    private boolean enabled;
+    private OutputStream stream;
+    private boolean enabledDraw;
+    private boolean enabledOutput;
 
     public Debug(OutputStream stream) {
         this.stream = stream;
     }
 
-    public void enable() {
-        enabled = true;
+    public void enableDraw() {
+        enabledDraw = true;
     }
 
-    public boolean isEnabled() {
-        return enabled;
+    public void enableOutput() {
+        enabledDraw = true;
+    }
+
+    public void disableDraw() {
+        enabledDraw = false;
+    }
+
+    public void disableOutput() {
+        enabledDraw = false;
+    }
+
+    public boolean isEnabledDraw() {
+        return enabledDraw;
+    }
+
+    public boolean isEnabledOutput() {
+        return enabledOutput;
     }
 
     public void draw(model.CustomData customData) {
-        if (enabled) {
+        if (enabledDraw) {
             try {
                 new model.PlayerMessageGame.CustomDataMessage(customData).writeTo(stream);
                 stream.flush();

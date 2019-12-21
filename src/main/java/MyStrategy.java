@@ -8,9 +8,9 @@ import java.util.*;
 public class MyStrategy implements Strategy {
 
     public static final double HEALTH_TO_LOOK_FOR_HEAL = 0.90;
+    public static final double MAX_SCORE = 100000.0;
     private static final double EPSILON = 0.000000001;
     private static final float OLD_DEBUG_TRANSPARENCY = 0.2f;
-
     private static LootBox willTakeThis;
     private static int willTakeUnitId = -1;
 
@@ -24,34 +24,7 @@ public class MyStrategy implements Strategy {
     private Player me;
     private Player enemy;
     private FlatWorldStrategy strat = new FlatWorldStrategy();
-
-    static double distanceSqr(Vec2Double a, Vec2Double b) {
-        return (a.getX() - b.getX()) * (a.getX() - b.getX()) + (a.getY() - b.getY()) * (a.getY() - b.getY());
-    }
-
-
-    double[][] getField(Vec2Double runningPos) {
-        int myX = (int) unit.getPosition().getX();
-        int myY = (int) unit.getPosition().getY();
-
-        int sizeX = tiles.length;
-        int sizeY = tiles[0].length;
-        double[][] field = new double[sizeX][sizeY];
-        for (int x = 0; x < sizeX; x++) {
-            for (int y = 0; y < sizeY; y++) {
-                if (y == sizeY - 1) {
-                    field[x][y] = -1;
-                }
-                if (tiles[x][y] == Tile.WALL) {
-                    field[x][y] = -1;
-                    if (y > 0) {
-                        field[x][y - 1] = -1;
-                    }
-                }
-            }
-        }
-        return field;
-    }
+    private DistanceMap distanceMap;
 
     @Override
     public Map<Integer, UnitAction> getAllActions(PlayerView playerView, Debug debug) {
@@ -69,7 +42,7 @@ public class MyStrategy implements Strategy {
         // убрать самовыпиливание на минах, сделать нормальный подрыв
         // TODO: 1. поиск пути между мин и врагов
         // TODO: 5. столкновение с другими игроками
-        // TODO: научить модель прыгать по головам
+        // TODO: научить модель прыгать по головам. вроде должна прыгать
         // TODO: 2. минимальный aim
         // TODO: 3. отстрел мин
         // TODO: 4. предсказание взрывов мин
@@ -94,15 +67,13 @@ public class MyStrategy implements Strategy {
         this.debug = debug;
         this.tiles = game.getLevel().getTiles();
 
-        if (game.getPlayers()[0].getId() == unit.getPlayerId()) {
-            me = game.getPlayers()[0];
-            enemy = game.getPlayers()[1];
-        } else {
-            me = game.getPlayers()[1];
-            enemy = game.getPlayers()[0];
-        }
+        this.distanceMap = new DistanceMap(tiles, game, unit, strat);
 
-//        this.debug.enable();
+        me = strat.getMe();
+        enemy = strat.getEnemy();
+
+//        this.debug.enableOutput();
+        this.debug.enableDraw();
 
         UnitAction action = new UnitAction();
         action.setSwapWeapon(false);
@@ -191,16 +162,8 @@ public class MyStrategy implements Strategy {
             }
 //            }
         }
-        boolean jump = runningPos.getY() > unit.getPosition().getY();
-        if (runningPos.getX() > unit.getPosition().getX() && getTile(unit.getPosition().getX() + 1, unit.getPosition().getY()) == Tile.WALL) {
-            jump = true;
-        }
-        if (runningPos.getX() < unit.getPosition().getX() && getTile(unit.getPosition().getX() - 1, unit.getPosition().getY()) == Tile.WALL) {
-            jump = true;
-        }
 
-        runningPos = jumpPadHack(runningPos);
-        setJumpAndVelocity(runningPos, jump, action);
+        setJumpAndVelocity(runningPos, action);
 
         if (unit.getWeapon() != null) {
             double spread = unit.getWeapon().getSpread();
@@ -243,7 +206,7 @@ public class MyStrategy implements Strategy {
 //                } else {
 //                    System.out.println(unit.getWeapon().getFireTimer() + " " + hitPNew.getEnemyHitProbability());
 //                }
-            } else if (hitPNew.getEnemyHitProbability() > 0.05) {
+            } else if (hitPNew.getEnemyHitProbability() - hitPNew.getAllyHitProbability() > 0.05) {
                 action.setShoot(true);
             }
 
@@ -256,7 +219,7 @@ public class MyStrategy implements Strategy {
             action.setAim(vecUtil.normalize(aim, 10.0));
         }
 
-        if (debug.isEnabled()) {
+        if (debug.isEnabledOutput()) {
             System.out.println("" + game.getCurrentTick() + ":" + unit.getId() + ":" + action + ":" + unit.getWeapon());
         }
 
@@ -277,20 +240,40 @@ public class MyStrategy implements Strategy {
         return units;
     }
 
-    private void setJumpAndVelocity(Vec2Double runningPos, boolean jump, UnitAction action) {
+    private void setJumpAndVelocity(Vec2Double runningPos, UnitAction action) {
+        this.distanceMap.updateTarget(runningPos);
+
+/*
+        double x = unit.getPosition().getX();
+        double y = unit.getPosition().getY();
+        boolean jump = runningPos.getY() > y;
+        if ((int) runningPos.getX() > (int) x && getTile(x + 1, y) == Tile.WALL) {
+            jump = true;
+        }
+        if ((int) runningPos.getX() < (int) x && getTile(x - 1, y) == Tile.WALL) {
+            jump = true;
+        }
+        boolean jumpDown = !jump;
+
+        runningPos = jumpPadHack(runningPos);
+
+        // platform jump hack
+        if (unit.getJumpState().getMaxTime() < game.getProperties().getUnitJumpTime()
+                && ((int) y - (int) (y + EPSILON - game.getProperties().getUnitJumpSpeed() / game.getProperties().getTicksPerSecond()) == 1)
+                && (getTile(x - halfUnitSizeX + EPSILON, y + EPSILON - game.getProperties().getUnitJumpSpeed() / game.getProperties().getTicksPerSecond()) == Tile.PLATFORM
+                || getTile(x + halfUnitSizeX - EPSILON, y + EPSILON - game.getProperties().getUnitJumpSpeed() / game.getProperties().getTicksPerSecond()) == Tile.PLATFORM)) {
+            jump = false;
+        }
+
         action.setVelocity(Math.signum(runningPos.getX() - unit.getPosition().getX()) * game.getProperties().getUnitMaxHorizontalSpeed());
         action.setJump(jump);
-        action.setJumpDown(!jump);
+        action.setJumpDown(jumpDown);
+*/
 
         neoAddon(runningPos, action, 100);
     }
 
     private void neoAddon(Vec2Double runningPos, UnitAction action, int depth) {
-
-        if (game.getBullets().length == 0) {
-            return;
-        }
-
         List<DummyBullet> bullets = new ArrayList<>();
         for (Bullet bullet : game.getBullets()) {
             if (bullet.getUnitId() != unit.getId()) {
@@ -302,9 +285,9 @@ public class MyStrategy implements Strategy {
             }
         }
 
-        if (bullets.size() == 0) {
-            return;
-        }
+//        if (bullets.size() == 0) {
+//            depth = 42;
+//        }
 
         Dummy[] allDummies = createAllDummies();
         Set<Dummy> dummies = new HashSet<>();
@@ -318,6 +301,14 @@ public class MyStrategy implements Strategy {
         dummies.add(new Dummy(unit, new JumpingStrat()));
         dummies.add(new Dummy(unit, new FallingStrat()));
         dummies.add(new Dummy(unit, new AbortJumpAndThenJumpStrat()));
+        dummies.add(new Dummy(unit, new PlatformJumpStrat()));
+        dummies.add(new Dummy(unit, new PlatformJumpStratLeft()));
+        dummies.add(new Dummy(unit, new PlatformJumpStratRight()));
+        dummies.add(new Dummy(unit, new LeftAlternatingJumpStrat()));
+        dummies.add(new Dummy(unit, new RightAlternatingJumpStrat()));
+
+        HashMap<Dummy, Double> scores = new HashMap<>();
+        dummies.forEach(item -> scores.put(item, 100000.0));
 
         for (Dummy dummy : dummies) {
             dummy.setOtherDummies(allDummies);
@@ -331,6 +322,10 @@ public class MyStrategy implements Strategy {
 
         for (int tick = 0; tick < depth; tick++) {
             dummies = new HashSet<>(survivors); // hack optimization
+            for (Dummy dum : dummies) {
+                int finalTick = tick;
+                scores.compute(dum, (k, v) -> Math.min(finalTick / 100.0 + distanceMap.getDistanceFromTarget(k.getPosition()), v));
+            }
             for (int j = 0; j < game.getProperties().getUpdatesPerTick(); j++) {
                 for (Iterator<DummyBullet> iterator = bullets.iterator(); iterator.hasNext(); ) {
                     DummyBullet bullet = iterator.next();
@@ -361,34 +356,43 @@ public class MyStrategy implements Strategy {
                     dummy.moveOneUpdateVertically();
                     lastDeadTick = checkBulletsCollisions(bullets, lastDead, lastDeadTick, survivors, tick, dummy);
                 }
+                for (Dummy other : allDummies) {
+                    other.moveOneUpdateHorizontally();
+                    other.moveOneUpdateVertically();
+                }
             }
         }
 
-        if (lastDead.size() > 0) {
-            Dummy choosenOne = null;
+//        if (lastDead.size() > 0) {
+        Dummy choosenOne = null;
 
-            // collision imminent
-            if (survivors.size() > 0) {
-                for (Dummy survivor : survivors) {
-                    if (choosenOne == null || vecUtil.length(survivor.getPosition(), runningPos) < vecUtil.length(choosenOne.getPosition(), runningPos)) {
-                        choosenOne = survivor;
-                    }
-                }
-            } else {
-                for (Dummy survivor : lastDead) {
-                    if (choosenOne == null || vecUtil.length(survivor.getPosition(), runningPos) < vecUtil.length(choosenOne.getPosition(), runningPos)) {
-                        choosenOne = survivor;
-                    }
+        // collision imminent
+        double choosenScore = MAX_SCORE;
+        if (survivors.size() > 0) {
+            for (Dummy survivor : survivors) {
+                double surScore = scores.get(survivor);
+                if (choosenOne == null || surScore < choosenScore) {
+                    choosenOne = survivor;
+                    choosenScore = surScore;
                 }
             }
-
-            if (choosenOne != null) {
-                choosenOne.getStrat().resetTick();
-                action.setVelocity(choosenOne.getStrat().getVelocity());
-                action.setJump(choosenOne.getStrat().isJumpUp());
-                action.setJumpDown(choosenOne.getStrat().isJumpDown());
+        } else {
+            for (Dummy survivor : lastDead) {
+                Double surScore = scores.get(survivor);
+                if (choosenOne == null || surScore < choosenScore) {
+                    choosenOne = survivor;
+                    choosenScore = surScore;
+                }
             }
         }
+
+        if (choosenOne != null) {
+            choosenOne.getStrat().reset(new Dummy(unit));
+            action.setVelocity(choosenOne.getStrat().getVelocity());
+            action.setJump(choosenOne.getStrat().isJumpUp());
+            action.setJumpDown(choosenOne.getStrat().isJumpDown());
+        }
+//        }
     }
 
     private int checkBulletsCollisions(List<DummyBullet> bullets, Set<Dummy> lastDead, int lastDeadTick, Set<Dummy> survivors, int tick, Dummy dummy) {
@@ -478,7 +482,7 @@ public class MyStrategy implements Strategy {
                 bullet.moveOneUpdateHorizontally();
                 bullet.moveOneUpdateVertically();
                 if (bullet.isHittingTheDummy(enemyDummy)) {
-                    if (debug.isEnabled()) {
+                    if (debug.isEnabledDraw()) {
                         debug.draw(new CustomData.Line(unitCenter.toFloatVector(), bullet.position.toFloatVector(),
                                 0.05f, new ColorFloat(0, 1, 1, 0.1f)));
                     }
@@ -487,13 +491,13 @@ public class MyStrategy implements Strategy {
                     hitVector = vecUtil.add(bullet.position, hitVector);
                 } else if (bullet.isHittingAWall()) {
                     if (bullet.isHittingTheDummyWithExplosion(enemyDummy)) {
-                        if (debug.isEnabled()) {
+                        if (debug.isEnabledDraw()) {
                             debug.draw(new CustomData.Line(unitCenter.toFloatVector(), bullet.position.toFloatVector(),
                                     0.05f, new ColorFloat(0, 1, 1, 0.1f)));
                         }
                         hitCount++;
                         hitVector = vecUtil.add(bullet.position, hitVector);
-                    } else if (debug.isEnabled()) {
+                    } else if (debug.isEnabledDraw()) {
                         debug.draw(new CustomData.Line(unitCenter.toFloatVector(), bullet.position.toFloatVector(),
                                 0.05f, new ColorFloat(1, 0, 1, OLD_DEBUG_TRANSPARENCY)));
                     }
@@ -530,7 +534,7 @@ public class MyStrategy implements Strategy {
         }
         Vec2Double unitCenter = vecUtil.getCenter(unit);
         int maxHitCount = Math.max(5, Math.min(51, 1 + 2 * ((int) (180.0 * spread / Math.PI))));
-        if (debug.isEnabled()) {
+        if (debug.isEnabledOutput()) {
             System.out.println(maxHitCount);
         }
         List<DummyBullet> bullets = new ArrayList<>();
@@ -633,13 +637,13 @@ public class MyStrategy implements Strategy {
 
     private void onBulletHittingADummy(Vec2Double unitCenter, HitProbabilities hitProbabilities, DummyBullet bullet, Dummy dummy) {
         if (dummy.unit.getPlayerId() == unit.getPlayerId()) {
-            if (debug.isEnabled()) {
+            if (debug.isEnabledDraw()) {
                 debug.draw(new CustomData.Line(unitCenter.toFloatVector(), bullet.position.toFloatVector(),
                         0.05f, new ColorFloat(0, 0, 1, OLD_DEBUG_TRANSPARENCY)));
             }
             hitProbabilities.allyHitCount++;
         } else {
-            if (debug.isEnabled()) {
+            if (debug.isEnabledDraw()) {
                 debug.draw(new CustomData.Line(unitCenter.toFloatVector(), bullet.position.toFloatVector(),
                         0.05f, new ColorFloat(0, 1, 0, OLD_DEBUG_TRANSPARENCY)));
             }
@@ -660,8 +664,8 @@ public class MyStrategy implements Strategy {
         for (LootBox lootBox : game.getLootBoxes()) {
             if (lootBox.getItem() instanceof Item.Weapon) {
                 if (weaponType == null || weaponType == ((Item.Weapon) lootBox.getItem()).getWeaponType()) {
-                    if (nearestWeapon == null || distanceSqr(unit.getPosition(),
-                            lootBox.getPosition()) < distanceSqr(unit.getPosition(), nearestWeapon.getPosition())) {
+                    if (nearestWeapon == null ||
+                            distanceMap.getDistance(lootBox.getPosition()) < distanceMap.getDistance(nearestWeapon.getPosition())) {
                         if (willTakeUnitId == unit.getId() || willTakeThis == null || !willTakeThis.getPosition().equals(lootBox.getPosition())) {
                             nearestWeapon = lootBox;
                         }
@@ -676,8 +680,7 @@ public class MyStrategy implements Strategy {
         LootBox nearestMineLootBox = null;
         for (LootBox lootBox : game.getLootBoxes()) {
             if (lootBox.getItem() instanceof Item.Mine) {
-                if (nearestMineLootBox == null || distanceSqr(unit.getPosition(),
-                        lootBox.getPosition()) < distanceSqr(unit.getPosition(), nearestMineLootBox.getPosition())) {
+                if (nearestMineLootBox == null || distanceMap.getDistance(lootBox.getPosition()) < distanceMap.getDistance(nearestMineLootBox.getPosition())) {
                     nearestMineLootBox = lootBox;
                 }
             }
@@ -689,8 +692,7 @@ public class MyStrategy implements Strategy {
         LootBox nearestHealth = null;
         for (LootBox lootBox : game.getLootBoxes()) {
             if (lootBox.getItem() instanceof Item.HealthPack) {
-                if (nearestHealth == null || distanceSqr(unit.getPosition(),
-                        lootBox.getPosition()) < distanceSqr(unit.getPosition(), nearestHealth.getPosition())) {
+                if (nearestHealth == null || distanceMap.getDistance(lootBox.getPosition()) < distanceMap.getDistance(nearestHealth.getPosition())) {
                     nearestHealth = lootBox;
                 }
             }
@@ -702,8 +704,7 @@ public class MyStrategy implements Strategy {
         Unit nearestEnemy = null;
         for (Unit other : game.getUnits()) {
             if (other.getPlayerId() != unit.getPlayerId()) {
-                if (nearestEnemy == null || distanceSqr(unit.getPosition(),
-                        other.getPosition()) < distanceSqr(unit.getPosition(), nearestEnemy.getPosition())) {
+                if (nearestEnemy == null || distanceMap.getDistance(other.getPosition()) < distanceMap.getDistance(nearestEnemy.getPosition())) {
                     nearestEnemy = other;
                 }
             }
@@ -715,8 +716,7 @@ public class MyStrategy implements Strategy {
         Unit nearestAlly = null;
         for (Unit other : game.getUnits()) {
             if (other.getPlayerId() == unit.getPlayerId() && unit.getId() != other.getId()) {
-                if (nearestAlly == null || distanceSqr(unit.getPosition(),
-                        other.getPosition()) < distanceSqr(unit.getPosition(), nearestAlly.getPosition())) {
+                if (nearestAlly == null || distanceMap.getDistance(other.getPosition()) < distanceMap.getDistance(nearestAlly.getPosition())) {
                     nearestAlly = other;
                 }
             }
@@ -748,8 +748,46 @@ public class MyStrategy implements Strategy {
         }
     }
 
+
+    class PlatformJumpStratLeft extends PlatformJumpStrat {
+        @Override
+        double getVelocity() {
+            return -game.getProperties().getUnitMaxHorizontalSpeed()/2.0;
+        }
+    }
+
+    class PlatformJumpStratRight extends PlatformJumpStrat {
+        @Override
+        double getVelocity() {
+            return game.getProperties().getUnitMaxHorizontalSpeed()/2.0;
+        }
+    }
+
+    class PlatformJumpStrat extends DummyStrat {
+        @Override
+        boolean isJumpUp() {
+            double x = dummy.getPosition().getX();
+            double y = dummy.getPosition().getY();
+            boolean jump = true;
+            if (dummy.canJumpForSeconds < game.getProperties().getUnitJumpTime()
+                    && ((int) y - (int) (y + EPSILON - game.getProperties().getUnitJumpSpeed() / game.getProperties().getTicksPerSecond()) == 1)
+                    && (getTile(x - halfUnitSizeX + EPSILON, y + EPSILON - game.getProperties().getUnitJumpSpeed() / game.getProperties().getTicksPerSecond()) == Tile.PLATFORM
+                    || getTile(x + halfUnitSizeX - EPSILON, y + EPSILON - game.getProperties().getUnitJumpSpeed() / game.getProperties().getTicksPerSecond()) == Tile.PLATFORM)) {
+                jump = false;
+            }
+
+            return jump;
+        }
+    }
+
     class DummyStrat {
         int tick = 0;
+
+        Dummy dummy;
+
+        public void setDummy(Dummy dummy) {
+            this.dummy = dummy;
+        }
 
         double getVelocity() {
             return 0.0;
@@ -767,8 +805,9 @@ public class MyStrategy implements Strategy {
             tick++;
         }
 
-        void resetTick() {
-            tick = 0;
+        void reset(Dummy dummy) {
+            this.tick = 0;
+            this.dummy = dummy;
         }
     }
 
@@ -837,6 +876,31 @@ public class MyStrategy implements Strategy {
         @Override
         boolean isJumpDown() {
             return tick == 0;
+        }
+    }
+
+    class LeftAlternatingJumpStrat extends JumpingStrat {
+        int direction = -1;
+        private int alternatingInterval = (int) (game.getProperties().getUnitJumpTime() * game.getProperties().getTicksPerSecond() / 2.0);
+
+        @Override
+        double getVelocity() {
+            return (double) direction * game.getProperties().getUnitMaxHorizontalSpeed();
+        }
+
+        @Override
+        void nextTick() {
+            super.nextTick();
+            if (tick % alternatingInterval == 0) {
+                direction = direction * -1;
+            }
+        }
+    }
+
+    class RightAlternatingJumpStrat extends LeftAlternatingJumpStrat {
+        @Override
+        double getVelocity() {
+            return -super.getVelocity();
         }
     }
 
@@ -915,7 +979,7 @@ public class MyStrategy implements Strategy {
             Tile tile3 = tiles[xMinusSize][yPlusSize];
             Tile tile4 = tiles[xPlusSize][yPlusSize];
             boolean hit = tile1 == Tile.WALL || tile2 == Tile.WALL || tile3 == Tile.WALL || tile4 == Tile.WALL;
-            if (debug.isEnabled() && hit && trace) {
+            if (debug.isEnabledDraw() && hit && trace) {
                 debug.draw(new CustomData.Line(startPosition.toFloatVector(), position.toFloatVector(), (float) size, new ColorFloat(1, 1, 1, 0.2f)));
             }
             return hit;
@@ -928,7 +992,7 @@ public class MyStrategy implements Strategy {
             Vec2Double dummyCenter = vecUtil.getCenter(dummy.getPosition(), dummy.unit.getSize());
             boolean hit = Math.abs(dummyCenter.getX() - position.getX()) <= (dummy.unit.getSize().getX() + size) / 2.0
                     && Math.abs(dummyCenter.getY() - position.getY()) <= (dummy.unit.getSize().getY() + size) / 2.0;
-            if (debug.isEnabled() && hit && trace) {
+            if (debug.isEnabledDraw() && hit && trace) {
                 debug.draw(new CustomData.Line(startPosition.toFloatVector(), position.toFloatVector(), (float) size, new ColorFloat(0, 1, 1, 0.2f)));
             }
 
@@ -960,6 +1024,7 @@ public class MyStrategy implements Strategy {
 
         public Dummy(Unit unit, DummyStrat strat) {
             this(unit);
+            strat.setDummy(this);
             this.strat = strat;
         }
 
@@ -1029,51 +1094,55 @@ public class MyStrategy implements Strategy {
         }
 
         public void moveOneUpdateVertically() {
-            boolean isFalling = true;
+            if (isPositionAffectedByJumpPad(position)) {
+                canCancelJump = false;
+                canJumpForSeconds = game.getProperties().getJumpPadJumpTime();
+                jumpSpeed = game.getProperties().getJumpPadJumpSpeed();
+            }
             if (isPositionAffectedByLadder(position)) {
-                isFalling = false;
+                // ползаем по лестнице
                 if (jumpingUp) {
                     Vec2Double newPosition = vecUtil.add(position, new Vec2Double(0, game.getProperties().getUnitJumpSpeed() / updatesPerSecond));
                     if (isPositionPossible(newPosition)) {
                         position = newPosition;
                     }
-                }
-            } else if (canJumpForSeconds > 0.0) {
-                if (canCancelJump && jumpingDown) {
-                    canJumpForSeconds = 0.0;
-                } else if (jumpingUp || !canCancelJump) {
-                    Vec2Double newPosition = vecUtil.add(position, new Vec2Double(0, jumpSpeed / updatesPerSecond));
+                } else if (jumpingDown) {
+                    Vec2Double newPosition = vecUtil.add(position, new Vec2Double(0, -game.getProperties().getUnitFallSpeed() / updatesPerSecond));
                     if (isPositionPossible(newPosition)) {
                         position = newPosition;
-                        isFalling = false;
-                    } else {
-                        canCancelJump = true;
-                        canJumpForSeconds = 0.0;
-                        jumpSpeed = 0.0;
                     }
-                    canJumpForSeconds -= 1.0 / updatesPerSecond;
-                } else {
-                    canJumpForSeconds -= 1.0 / updatesPerSecond;
                 }
-            }
-            if ((isFalling && !isStandingPosition(position)) || jumpingDown) {
-                Vec2Double newPosition = vecUtil.add(position, new Vec2Double(0, -game.getProperties().getUnitFallSpeed() / updatesPerSecond));
-                if (isPositionPossible(newPosition)) {
-                    position = newPosition;
-                } else {
-                    resetJumpState();
-                }
-            }
-            if (debug.isEnabled() && microTick == 0 && vecUtil.length(vecUtil.substract(position, oldPosition)) > EPSILON) {
-                debug.draw(new CustomData.Line(oldPosition.toFloatVector(), position.toFloatVector(), 0.05f, new ColorFloat(bulletsCaught.size() / 2.0f, 0, 1, 1)));
-            }
-            if (isStandingPosition(position) && /*not jumping*/(canCancelJump || canJumpForSeconds < EPSILON)) {
                 resetJumpState();
+            } else {
+                // прыгаем
+                boolean isJumping = false;
+                if (canJumpForSeconds > EPSILON && (!canCancelJump || jumpingUp)) {
+                    Vec2Double newPosition = vecUtil.add(position, new Vec2Double(0, jumpSpeed / updatesPerSecond));
+                    if (isPositionPossible(newPosition)) {
+                        canJumpForSeconds -= 1.0 / updatesPerSecond;
+                        position = newPosition;
+                        isJumping = true;
+                    }
+                }
+                // падаем
+                if (!isJumping) {
+                    boolean isStandingPosition = isStandingPosition(position);
+                    if (jumpingDown || !isStandingPosition) {
+                        resetJumpStateToFreeFall();
+                        Vec2Double newPosition = vecUtil.add(position, new Vec2Double(0, -game.getProperties().getUnitFallSpeed() / updatesPerSecond));
+                        if (isPositionPossible(newPosition)) {
+                            position = newPosition;
+                        } else {
+                            resetJumpState();
+                        }
+                    } else if (isStandingPosition) {
+                        resetJumpState();
+                    }
+                }
             }
-            if (isPositionAffectedByJumpPad(position)) {
-                canCancelJump = false;
-                canJumpForSeconds = game.getProperties().getJumpPadJumpTime();
-                jumpSpeed = game.getProperties().getJumpPadJumpSpeed();
+
+            if (debug.isEnabledDraw() && microTick == 0 && vecUtil.length(vecUtil.substract(position, oldPosition)) > EPSILON) {
+                debug.draw(new CustomData.Line(oldPosition.toFloatVector(), position.toFloatVector(), 0.05f, new ColorFloat(bulletsCaught.size() / 2.0f, 0, 1, 1)));
             }
         }
 
@@ -1081,6 +1150,12 @@ public class MyStrategy implements Strategy {
             canCancelJump = true;
             canJumpForSeconds = game.getProperties().getUnitJumpTime();
             jumpSpeed = game.getProperties().getUnitJumpSpeed();
+        }
+
+        private void resetJumpStateToFreeFall() {
+            canCancelJump = false;
+            canJumpForSeconds = 0.0;
+            jumpSpeed = 0.0;
         }
 
         public boolean isPositionPossible(Vec2Double position) {
