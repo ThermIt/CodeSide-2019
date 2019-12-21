@@ -23,7 +23,7 @@ public class MyStrategy implements Strategy {
     private Tile[][] tiles;
     private Player me;
     private Player enemy;
-
+    private FlatWorldStrategy strat = new FlatWorldStrategy();
 
     static double distanceSqr(Vec2Double a, Vec2Double b) {
         return (a.getX() - b.getX()) * (a.getX() - b.getX()) + (a.getY() - b.getY()) * (a.getY() - b.getY());
@@ -54,9 +54,19 @@ public class MyStrategy implements Strategy {
     }
 
     @Override
+    public Map<Integer, UnitAction> getAllActions(PlayerView playerView, Debug debug) {
+        strat.UpdateTick(playerView, debug);
+        Map<Integer, UnitAction> actions = new HashMap<>();
+        for (model.Unit unit : playerView.getGame().getUnits()) {
+            if (unit.getPlayerId() == playerView.getMyId()) {
+                actions.put(unit.getId(), getAction(unit, playerView.getGame(), debug));
+            }
+        }
+        return actions;
+    }
+
     public UnitAction getAction(Unit unit, Game game, Debug debug) {
         // убрать самовыпиливание на минах, сделать нормальный подрыв
-        // TODO: бои вплотную сделать менее дёргарыми
         // TODO: 1. поиск пути между мин и врагов
         // TODO: 5. столкновение с другими игроками
         // TODO: научить модель прыгать по головам
@@ -155,7 +165,7 @@ public class MyStrategy implements Strategy {
         if (unit.getWeapon() == null && nearestWeapon != null) {
             willTakeThis = nearestWeapon;
             willTakeUnitId = unit.getId();
-            debug.draw(new CustomData.Rect(nearestWeapon.getPosition().toFloatVector(), new Vec2Float(1f, 1f), new ColorFloat(0.5f,1f,0f,0.2f)));
+            debug.draw(new CustomData.Rect(nearestWeapon.getPosition().toFloatVector(), new Vec2Float(1f, 1f), new ColorFloat(0.5f, 1f, 0f, 0.2f)));
 
             runningPos = nearestWeapon.getPosition();
         } else if (unit.getWeapon() != null && unit.getWeapon().getTyp() != WeaponType.PISTOL && nearestLauncher != null) {
@@ -204,19 +214,19 @@ public class MyStrategy implements Strategy {
             }
             if (hitPNew.getEnemyHitProbability() - hitPOld.getEnemyHitProbability() >= 0.02 || unit.getWeapon() == null || unit.getWeapon().getLastAngle() == null) {
                 action.setAim(vecUtil.normalize(aim, 10.0));
-                debug.draw(new CustomData.Rect(unit.getPosition().toFloatVector(), new Vec2Float(0.3f, 0.3f), new ColorFloat(1f,0f,0f,1f)));
-                debug.draw(new CustomData.Rect(vecUtil.add(unit.getPosition(), vecUtil.normalize(aim, 10.0)).toFloatVector(), new Vec2Float(0.3f, 0.3f), new ColorFloat(1f,0f,0f,1f)));
+                debug.draw(new CustomData.Rect(unit.getPosition().toFloatVector(), new Vec2Float(0.3f, 0.3f), new ColorFloat(1f, 0f, 0f, 1f)));
+                debug.draw(new CustomData.Rect(vecUtil.add(unit.getPosition(), vecUtil.normalize(aim, 10.0)).toFloatVector(), new Vec2Float(0.3f, 0.3f), new ColorFloat(1f, 0f, 0f, 1f)));
             } else {
                 hitPNew = hitPOld;
                 Vec2Double lastAim = vecUtil.fromAngle(unit.getWeapon().getLastAngle(), 10.0);
                 if (vecUtil.angleBetween(aim, lastAim) < Math.PI / 4.0) {
                     action.setAim(lastAim);
-                    debug.draw(new CustomData.Rect(unit.getPosition().toFloatVector(), new Vec2Float(0.3f, 0.3f), new ColorFloat(0f,1f,0f,1f)));
-                    debug.draw(new CustomData.Rect(vecUtil.add(unit.getPosition(), lastAim).toFloatVector(), new Vec2Float(0.3f, 0.3f), new ColorFloat(0f,1f,0f,1f)));
+                    debug.draw(new CustomData.Rect(unit.getPosition().toFloatVector(), new Vec2Float(0.3f, 0.3f), new ColorFloat(0f, 1f, 0f, 1f)));
+                    debug.draw(new CustomData.Rect(vecUtil.add(unit.getPosition(), lastAim).toFloatVector(), new Vec2Float(0.3f, 0.3f), new ColorFloat(0f, 1f, 0f, 1f)));
                 } else {
                     action.setAim(vecUtil.normalize(aim, 10.0));
-                    debug.draw(new CustomData.Rect(unit.getPosition().toFloatVector(), new Vec2Float(0.3f, 0.3f), new ColorFloat(0f,0f,1f,1f)));
-                    debug.draw(new CustomData.Rect(vecUtil.add(unit.getPosition(), vecUtil.normalize(aim, 10.0)).toFloatVector(), new Vec2Float(0.3f, 0.3f), new ColorFloat(0f,0f,1f,1f)));
+                    debug.draw(new CustomData.Rect(unit.getPosition().toFloatVector(), new Vec2Float(0.3f, 0.3f), new ColorFloat(0f, 0f, 1f, 1f)));
+                    debug.draw(new CustomData.Rect(vecUtil.add(unit.getPosition(), vecUtil.normalize(aim, 10.0)).toFloatVector(), new Vec2Float(0.3f, 0.3f), new ColorFloat(0f, 0f, 1f, 1f)));
                 }
             }
             if (unit.getWeapon().getTyp() == WeaponType.ROCKET_LAUNCHER) {
@@ -1056,15 +1066,19 @@ public class MyStrategy implements Strategy {
                 debug.draw(new CustomData.Line(oldPosition.toFloatVector(), position.toFloatVector(), 0.05f, new ColorFloat(bulletsCaught.size() / 2.0f, 0, 1, 1)));
             }
             if (isStandingPosition(position) && /*not jumping*/(canCancelJump || canJumpForSeconds < EPSILON)) {
-                canCancelJump = true;
-                canJumpForSeconds = game.getProperties().getUnitJumpTime();
-                jumpSpeed = game.getProperties().getUnitJumpSpeed();
+                resetJumpState();
             }
             if (isPositionAffectedByJumpPad(position)) {
                 canCancelJump = false;
                 canJumpForSeconds = game.getProperties().getJumpPadJumpTime();
                 jumpSpeed = game.getProperties().getJumpPadJumpSpeed();
             }
+        }
+
+        private void resetJumpState() {
+            canCancelJump = true;
+            canJumpForSeconds = game.getProperties().getUnitJumpTime();
+            jumpSpeed = game.getProperties().getUnitJumpSpeed();
         }
 
         public boolean isPositionPossible(Vec2Double position) {

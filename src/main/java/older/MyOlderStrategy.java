@@ -22,7 +22,6 @@ public class MyOlderStrategy implements Strategy {
         return (a.getX() - b.getX()) * (a.getX() - b.getX()) + (a.getY() - b.getY()) * (a.getY() - b.getY());
     }
 
-    @Override
     public UnitAction getAction(Unit unit, Game game, Debug debug) {
         this.unit = unit;
         this.game = game;
@@ -400,6 +399,17 @@ public class MyOlderStrategy implements Strategy {
             }
         }
         return nearestEnemy;
+    }
+
+    @Override
+    public Map<Integer, UnitAction> getAllActions(PlayerView playerView, Debug debug) {
+        Map<Integer, UnitAction> actions = new HashMap<>();
+        for (model.Unit unit : playerView.getGame().getUnits()) {
+            if (unit.getPlayerId() == playerView.getMyId()) {
+                actions.put(unit.getId(), getAction(unit, playerView.getGame(), debug));
+            }
+        }
+        return actions;
     }
 
     class DummyStrat {

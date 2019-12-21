@@ -1,9 +1,10 @@
 package util;
 
-import model.Game;
-import model.Unit;
+import model.PlayerView;
 import model.UnitAction;
 
+import java.util.Map;
+
 public interface Strategy {
-    UnitAction getAction(Unit unit, Game game, Debug debug);
+    Map<Integer, UnitAction> getAllActions(PlayerView playerView, Debug debug);
 }

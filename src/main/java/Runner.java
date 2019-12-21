@@ -1,3 +1,4 @@
+import model.UnitAction;
 import older.MyOlderStrategy;
 import util.Debug;
 import util.Strategy;
@@ -5,7 +6,6 @@ import util.StreamUtil;
 
 import java.io.*;
 import java.net.Socket;
-import java.util.HashMap;
 import java.util.Map;
 
 public class Runner {
@@ -59,12 +59,7 @@ public class Runner {
                 if (playerView == null) {
                     break;
                 }
-                Map<Integer, model.UnitAction> actions = new HashMap<>();
-                for (model.Unit unit : playerView.getGame().getUnits()) {
-                    if (unit.getPlayerId() == playerView.getMyId()) {
-                        actions.put(unit.getId(), myStrategy.getAction(unit, playerView.getGame(), debug));
-                    }
-                }
+                Map<Integer, UnitAction> actions = myStrategy.getAllActions(playerView, debug);
                 new model.PlayerMessageGame.ActionMessage(new model.Versioned(actions)).writeTo(outputStream);
                 outputStream.flush();
             }
