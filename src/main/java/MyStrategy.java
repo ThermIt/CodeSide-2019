@@ -1060,6 +1060,8 @@ public class MyStrategy implements Strategy {
                 Vec2Double newPosition = vecUtil.add(position, new Vec2Double(0, -game.getProperties().getUnitFallSpeed() / updatesPerSecond));
                 if (isPositionPossible(newPosition)) {
                     position = newPosition;
+                } else {
+                    resetJumpState();
                 }
             }
             if (debug.isEnabled() && microTick == 0 && vecUtil.length(vecUtil.substract(position, oldPosition)) > EPSILON) {
