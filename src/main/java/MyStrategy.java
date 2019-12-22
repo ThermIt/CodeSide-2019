@@ -73,7 +73,7 @@ public class MyStrategy implements Strategy {
         enemy = strat.getEnemy();
 
 //        this.debug.enableOutput();
-        this.debug.enableDraw();
+//        this.debug.enableDraw();
 
         UnitAction action = new UnitAction();
         action.setSwapWeapon(false);
@@ -270,7 +270,7 @@ public class MyStrategy implements Strategy {
         action.setJumpDown(jumpDown);
 */
 
-        neoAddon(runningPos, action, 100);
+        neoAddon(runningPos, action, 66);
     }
 
     private void neoAddon(Vec2Double runningPos, UnitAction action, int depth) {
