@@ -13,6 +13,12 @@ public class MyStrategy implements Strategy {
      * p2 player Global result  10520 / 3520
      * 100 : 0
      * draws: 0
+     *
+     * final-2d stats
+     * p1 player Global result  219460 / 19460
+     * p2 player Global result  15050 / 4050
+     * 100 : 0
+     * draws: 0
      *  */
 
     public static final double HEALTH_TO_LOOK_FOR_HEAL = 0.90;
