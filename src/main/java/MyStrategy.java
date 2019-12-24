@@ -104,7 +104,10 @@ public class MyStrategy implements Strategy {
             this.jumppads = jumppads;
         }
 
-        this.distanceMap = new DistanceMap(tiles, game, unit, strat);
+        if (this.distanceMap == null) {
+            this.distanceMap = new DistanceMap(tiles, strat);
+        }
+        this.distanceMap.tickUpdate(game, unit);
 
         me = strat.getMe();
         enemy = strat.getEnemy();
@@ -163,6 +166,7 @@ public class MyStrategy implements Strategy {
         }
 */
 
+        DistanceMap.TargetType type = DistanceMap.TargetType.EMPTY;
         LootBox nearestWeapon = getNearestWeapon(null);
         willTakeThis = null; // reset every tick
         willTakeUnitId = -1;
@@ -183,6 +187,7 @@ public class MyStrategy implements Strategy {
             runningPos = nearestMineBox.getPosition();
         } else if (unit.getHealth() < game.getProperties().getUnitMaxHealth() * HEALTH_TO_LOOK_FOR_HEAL && nearestHealthPack != null) {
             runningPos = nearestHealthPack.getPosition();
+            type = DistanceMap.TargetType.HEALTH;
         } else if (nearestEnemy != null) {
             runningPos = nearestEnemy.getPosition();
         }
@@ -200,6 +205,7 @@ public class MyStrategy implements Strategy {
 //            }
         }
 
+        this.distanceMap.updateTarget(type, runningPos, game);
         setJumpAndVelocity(runningPos, action);
 
         if (unit.getWeapon() != null) {
@@ -237,12 +243,10 @@ public class MyStrategy implements Strategy {
                         action.setShoot(true);
                     }
                 }
-//            } else if (unit.getWeapon().getTyp() == WeaponType.PISTOL) {
-//                if (hitPNew.getEnemyHitProbability() > 0.3) {
-//                    action.setShoot(true);
-//                } else {
-//                    System.out.println(unit.getWeapon().getFireTimer() + " " + hitPNew.getEnemyHitProbability());
-//                }
+            } else if (unit.getWeapon().getTyp() == WeaponType.PISTOL) {
+                if (hitPNew.getEnemyHitProbability() - hitPNew.getAllyHitProbability() > 0.05) {
+                    action.setShoot(true);
+                }
             } else if (hitPNew.getEnemyHitProbability() - hitPNew.getAllyHitProbability() > 0.05) {
                 action.setShoot(true);
             }
@@ -300,7 +304,6 @@ public class MyStrategy implements Strategy {
     }
 
     private void setJumpAndVelocity(Vec2Double runningPos, UnitAction action) {
-        this.distanceMap.updateTarget(runningPos);
 
 /*
         double x = unit.getPosition().getX();
@@ -577,7 +580,13 @@ public class MyStrategy implements Strategy {
         Unit[] units = game.getUnits();
         for (int i = 0; i < units.length; i++) {
             Unit unit = units[i];
-            Dummy dummy = new Dummy(unit);
+            Dummy dummy;
+            if (unit.getPlayerId() == me.getId() && unit.getId() > this.unit.getId()) {
+                // stuck prevention hack
+                dummy = new Dummy(unit, new JumpingStrat());
+            } else {
+                dummy = new Dummy(unit);
+            }
             dummies[i] = dummy;
             dummy.setOtherDummies(dummies);
         }
