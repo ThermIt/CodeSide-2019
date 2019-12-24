@@ -29,6 +29,8 @@ public class MyStrategy implements Strategy {
     private double updatesPerSecond;
     private double halfUnitSizeX;
     private double halfUnitSizeY;
+    private double fullUnitSizeX;
+    private double fullUnitSizeY;
     private Tile[][] tiles;
     private Tile[][] jumppads;
     private Player me;
@@ -49,18 +51,21 @@ public class MyStrategy implements Strategy {
     }
 
     public UnitAction getAction(Unit unit, Game game, Debug debug) {
+
+        // оббегать мины стороной
+        // бегать за аптечками даже без оружия
+        // взрывать минами
+        // унижать
+        // не добивать базукой если сам умру а враг нет
+
+
         // выбирать угол стрельбы с учётом нового spread!!! для увеличения вероятности поражения
         // план
         // убегать если хватает очкой
-        // взрывать минами
-        // унижать
         // брать ракетницу и пистолет
-        // не добивать базукой если сам умру а враг нет
         // увеличить вес врага чтоб мимо него не бегать
-        // бегать за аптечками даже без оружия
         // на земле убегать горизонтально, в воздухе убегать вверх
 
-        // убрать самовыпиливание на минах, сделать нормальный подрыв
         // TODO: 1. поиск пути между мин и врагов
         // TODO: 5. столкновение с другими игроками
         // TODO: научить модель прыгать по головам. вроде должна прыгать
@@ -85,8 +90,10 @@ public class MyStrategy implements Strategy {
         this.unit = unit;
         this.game = game;
         this.updatesPerSecond = game.getProperties().getTicksPerSecond() * (double) game.getProperties().getUpdatesPerTick();
-        this.halfUnitSizeX = game.getProperties().getUnitSize().getX() / 2.0;
-        this.halfUnitSizeY = game.getProperties().getUnitSize().getY() / 2.0;
+        this.fullUnitSizeX = game.getProperties().getUnitSize().getX();
+        this.fullUnitSizeY = game.getProperties().getUnitSize().getY();
+        this.halfUnitSizeX = fullUnitSizeX / 2.0;
+        this.halfUnitSizeY = fullUnitSizeY / 2.0;
         this.debug = debug;
         this.tiles = game.getLevel().getTiles();
         if (this.jumppads == null) { // move to other class
@@ -209,6 +216,8 @@ public class MyStrategy implements Strategy {
         setJumpAndVelocity(runningPos, action);
 
         if (unit.getWeapon() != null) {
+            aim = vecUtil.add(vecUtil.normalize(aim, 10), vecUtil.fromAngle(unit.getWeapon().getLastAngle(), 5)); // smooth hack
+
             double spread = unit.getWeapon().getSpread();
             if (unit.getWeapon().getLastAngle() != null) {
                 spread = Math.min(spread + vecUtil.angleBetween(aim, vecUtil.fromAngle(unit.getWeapon().getLastAngle(), 10.0)), unit.getWeapon().getParams().getMaxSpread());
@@ -244,10 +253,10 @@ public class MyStrategy implements Strategy {
                     }
                 }
             } else if (unit.getWeapon().getTyp() == WeaponType.PISTOL) {
-                if (hitPNew.getEnemyHitProbability() - hitPNew.getAllyHitProbability() > 0.05) {
+                if (hitPNew.getEnemyHitProbability() - hitPNew.getAllyHitProbability() > 0.3) {
                     action.setShoot(true);
                 }
-            } else if (hitPNew.getEnemyHitProbability() - hitPNew.getAllyHitProbability() > 0.05) {
+            } else if (hitPNew.getEnemyHitProbability() - hitPNew.getAllyHitProbability() > 0.1) {
                 action.setShoot(true);
             }
 
@@ -1113,8 +1122,8 @@ public class MyStrategy implements Strategy {
             if (dummy.unit.getId() == unit.getId()) {
                 return false;
             }
-            return Math.abs(dummy.getPosition().getX() - position.getX()) <= dummy.unit.getSize().getX()
-                    && Math.abs(dummy.getPosition().getY() - position.getY()) <= dummy.unit.getSize().getY();
+            return Math.abs(dummy.getPosition().getX() - position.getX()) <= fullUnitSizeX
+                    && Math.abs(dummy.getPosition().getY() - position.getY()) <= fullUnitSizeY;
         }
 
         void catchBullet(DummyBullet bullet) {
@@ -1152,12 +1161,13 @@ public class MyStrategy implements Strategy {
         }
 
         public void moveOneUpdateVertically() {
-            if (isPositionAffectedByJumpPad(position)) {
+            boolean positionAffectedByLadder = isPositionAffectedByLadder(position);
+            if (isPositionAffectedByJumpPad(position, positionAffectedByLadder)) {
                 canCancelJump = false;
                 canJumpForSeconds = game.getProperties().getJumpPadJumpTime();
                 jumpSpeed = game.getProperties().getJumpPadJumpSpeed();
             }
-            if (isPositionAffectedByLadder(position)) {
+            if (positionAffectedByLadder) {
                 // ползаем по лестнице
                 if (jumpingUp) {
                     Vec2Double newPosition = vecUtil.add(position, new Vec2Double(0, game.getProperties().getUnitJumpSpeed() / updatesPerSecond));
@@ -1184,7 +1194,7 @@ public class MyStrategy implements Strategy {
                 }
                 // падаем
                 if (!isJumping) {
-                    boolean isStandingPosition = isStandingPosition(position);
+                    boolean isStandingPosition = isStandingPosition(position, positionAffectedByLadder);
                     if (jumpingDown || !isStandingPosition) {
                         resetJumpStateToFreeFall();
                         Vec2Double newPosition = vecUtil.add(position, new Vec2Double(0, -game.getProperties().getUnitFallSpeed() / updatesPerSecond));
@@ -1200,7 +1210,7 @@ public class MyStrategy implements Strategy {
             }
 
             if (debug.isEnabledDraw() && microTick == 0 && vecUtil.length(vecUtil.substract(position, oldPosition)) > EPSILON) {
-                debug.draw(new CustomData.Line(oldPosition.toFloatVector(), position.toFloatVector(), 0.05f, new ColorFloat(bulletsCaught.size() / 2.0f, 0, 1, 1)));
+//                debug.draw(new CustomData.Line(oldPosition.toFloatVector(), position.toFloatVector(), 0.05f, new ColorFloat(bulletsCaught.size() / 2.0f, 0, 1, 1)));
             }
         }
 
@@ -1230,8 +1240,8 @@ public class MyStrategy implements Strategy {
                     && getTile(position.getX() + halfUnitSizeX, position.getY() + unit.getSize().getY()) != Tile.WALL;
         }
 
-        public boolean isPositionAffectedByJumpPad(Vec2Double position) {
-            if (!isJumppadNearby((int) position.getX(), (int) position.getY())) {
+        public boolean isPositionAffectedByJumpPad(Vec2Double position, boolean positionAffectedByLadder) {
+            if (positionAffectedByLadder || !isJumppadNearby((int) position.getX(), (int) position.getY())) {
                 return false;
             }
             Tile tile00 = getTile(position.getX() - halfUnitSizeX, position.getY());
@@ -1240,9 +1250,8 @@ public class MyStrategy implements Strategy {
             Tile tile11 = getTile(position.getX() + halfUnitSizeX, position.getY() + halfUnitSizeY);
             Tile tile02 = getTile(position.getX() - halfUnitSizeX, position.getY() + unit.getSize().getY());
             Tile tile12 = getTile(position.getX() + halfUnitSizeX, position.getY() + unit.getSize().getY());
-            return (tile00 == Tile.JUMP_PAD || tile10 == Tile.JUMP_PAD || tile01 == Tile.JUMP_PAD ||
-                    tile11 == Tile.JUMP_PAD || tile02 == Tile.JUMP_PAD || tile12 == Tile.JUMP_PAD)
-                    && !isPositionAffectedByLadder(position);
+            return tile00 == Tile.JUMP_PAD || tile10 == Tile.JUMP_PAD || tile01 == Tile.JUMP_PAD ||
+                    tile11 == Tile.JUMP_PAD || tile02 == Tile.JUMP_PAD || tile12 == Tile.JUMP_PAD;
         }
 
 
@@ -1251,8 +1260,8 @@ public class MyStrategy implements Strategy {
                     || getTile(position.getX(), position.getY() - EPSILON) == Tile.LADDER;
         }
 
-        public boolean isStandingPosition(Vec2Double position) {
-            if (isPositionAffectedByLadder(position)) {
+        public boolean isStandingPosition(Vec2Double position, boolean positionAffectedByLadder) {
+            if (positionAffectedByLadder) {
                 return true;
             }
 
