@@ -7,6 +7,14 @@ import java.util.*;
 
 public class MyStrategy implements Strategy {
 
+    /*
+    * final-1 stats
+    * p1 player Global result  218725 / 19725
+    * p2 player Global result  10520 / 3520
+    * 100 : 0
+    * draws: 0
+    *  */
+
     public static final double HEALTH_TO_LOOK_FOR_HEAL = 0.90;
     public static final double MAX_SCORE = 100000.0;
     private static final double EPSILON = 0.000000001;
@@ -39,6 +47,16 @@ public class MyStrategy implements Strategy {
     }
 
     public UnitAction getAction(Unit unit, Game game, Debug debug) {
+        // выбирать угол стрельбы с учётом нового spread!!! для увеличения вероятности поражения
+        // план
+        // убегать если хватает очкой
+        // взрывать минами
+        // унижать
+        // брать ракетницу и пистолет
+        // не добивать базукой если сам умру а враг нет
+        // увеличить вес врага чтоб мимо него не бегать
+        // бегать за аптечками даже без оружия
+
         // убрать самовыпиливание на минах, сделать нормальный подрыв
         // TODO: 1. поиск пути между мин и врагов
         // TODO: 5. столкновение с другими игроками
@@ -50,6 +68,7 @@ public class MyStrategy implements Strategy {
         // ограничить глубину просчёта пуль самым дальним юнитом+радиус взрыва пули
         // высчитывать взрывы, кто выиграет
         // не стрелять первым вплотную из ракетницы если я из-за этого проиграю
+        // отбегать на перезарядку
 
         // 2 раунд, поражения:
         // 5x пустил врага к аптечкам, сам не брал
