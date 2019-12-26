@@ -300,6 +300,35 @@ public class MyStrategy implements Strategy {
                 }
             }
         }
+        if (unit.getWeapon() != null && unit.getWeapon().getTyp() != WeaponType.ROCKET_LAUNCHER
+                && (unit.getWeapon().getFireTimer() == null || unit.getWeapon().getFireTimer() * game.getProperties().getTicksPerSecond() < 2.0)
+                && game.getMines() != null && game.getMines().length > 0) {
+            Vec2Double myCenter = vecUtil.getCenter(unit.getPosition(), unit.getSize());
+            List<DummyMine> mines = new LinkedList<>();
+            DummyMine closest = null;
+            double closestDistance = 100000.0;
+            for (Mine mine : game.getMines()) {
+                DummyMine dummyMine = new DummyMine(mine);
+                mines.add(dummyMine);
+                double currentDistance = vecUtil.length(myCenter, dummyMine.getPosition());
+                if (currentDistance < closestDistance) {
+                    closest = dummyMine;
+                    closestDistance = currentDistance;
+                }
+            }
+            if (closestDistance < 2) {
+                double ticks = (unit.getWeapon().getFireTimer() == null ? 0.0 : unit.getWeapon().getFireTimer() * game.getProperties().getTicksPerSecond())
+                        +
+                        (closestDistance - (unit.getWeapon().getParams().getBullet().getSize() + game.getProperties().getMineSize().getX()) / 2.0)
+                                / unit.getWeapon().getParams().getBullet().getSpeed();
+
+                // explosian after ticks
+                System.out.println(ticks);
+                action.setAim(vecUtil.normalize(vecUtil.substract(closest.getPosition(), unit.getPosition()), 10.0));
+                action.setShoot(true); // check kill
+            }
+
+        }
         return action;
     }
 
