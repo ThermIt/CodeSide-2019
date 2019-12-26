@@ -22,7 +22,7 @@ public class MyOlderStrategy implements Strategy {
         return (a.getX() - b.getX()) * (a.getX() - b.getX()) + (a.getY() - b.getY()) * (a.getY() - b.getY());
     }
 
-    public UnitAction getAction(Unit unit, Game game, Debug debug) {
+    public UnitAction getAction(Unit unit, Game game) {
         this.unit = unit;
         this.game = game;
         this.updatesPerSecond = game.getProperties().getTicksPerSecond() * (double) game.getProperties().getUpdatesPerTick();
@@ -406,7 +406,7 @@ public class MyOlderStrategy implements Strategy {
         Map<Integer, UnitAction> actions = new HashMap<>();
         for (model.Unit unit : playerView.getGame().getUnits()) {
             if (unit.getPlayerId() == playerView.getMyId()) {
-                actions.put(unit.getId(), getAction(unit, playerView.getGame(), debug));
+                actions.put(unit.getId(), getAction(unit, playerView.getGame()));
             }
         }
         return actions;

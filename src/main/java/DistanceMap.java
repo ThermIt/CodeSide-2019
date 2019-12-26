@@ -11,6 +11,8 @@ public class DistanceMap {
     private int[][] distanceMapFromTarget;
     private int[][] distanceMapFromHealth;
     private int healthCount = -1;
+    private int[][] distanceMapFromMine;
+    private int mineCount = -1;
     private Game game;
     private Unit unit;
     private int sizeX;
@@ -33,14 +35,21 @@ public class DistanceMap {
     }
 
     public void updateTarget(TargetType type, Vec2Double target, Game game) {
-        if (type == TargetType.HEALTH) {
-            updateHealthMap(game);
-            distanceMapFromTarget = distanceMapFromHealth;
-        } else {
-            distanceMapFromTarget = new int[sizeX][sizeY];
-            if (target != null) {
-                fillDistances(distanceMapFromTarget, target);
-            }
+        switch (type) {
+            case HEALTH:
+                updateHealthMap(game);
+                distanceMapFromTarget = distanceMapFromHealth;
+                break;
+            case MINE:
+                updateMineMap(game);
+                distanceMapFromTarget = distanceMapFromMine;
+                break;
+            case EMPTY:
+            default:
+                distanceMapFromTarget = new int[sizeX][sizeY];
+                if (target != null) {
+                    fillDistances(distanceMapFromTarget, target);
+                }
         }
     }
 
@@ -93,8 +102,20 @@ public class DistanceMap {
         }
     }
 
+    private void updateMineMap(Game game) {
+        List<LootBox> healthBoxes = Arrays.stream(game.getLootBoxes()).filter(box -> box.getItem() instanceof Item.Mine).collect(Collectors.toList());
+        int count = healthBoxes.size();
+        if (count != mineCount) {
+            distanceMapFromMine = new int[sizeX][sizeY];
+            List<Coordinate> coordinates = healthBoxes.stream().map(box -> new Coordinate(box.getPosition())).collect(Collectors.toList());
+            fillDistances(distanceMapFromMine, coordinates);
+            mineCount = count;
+        }
+    }
+
     public enum TargetType {
         EMPTY,
+        MINE,
         HEALTH
     }
 

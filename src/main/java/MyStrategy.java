@@ -19,6 +19,18 @@ public class MyStrategy implements Strategy {
      * p2 player Global result  15050 / 4050
      * 100 : 0
      * draws: 0
+     *
+     * with mines against previous version
+     * p1 player Global result  160640 / 15640
+     * p2 player Global result  187070 / 25070
+     * 30 : 70
+     * draws: 0
+     *
+     * mines and mine evasion
+     * p1 player Global result  160245 / 15245
+     * p2 player Global result  180840 / 23840
+     * 36 : 63
+     * draws: 1
      *  */
 
     public static final double HEALTH_TO_LOOK_FOR_HEAL = 0.90;
@@ -134,27 +146,6 @@ public class MyStrategy implements Strategy {
         Unit nearestEnemy = getNearestEnemy();
         Unit nearestAlly = getNearestAlly();
 
-//        boolean nearGround = unit.isOnGround() || (0 != ((int) (unit.getPosition().getY()) - (int) (unit.getPosition().getY() - 2.0 * game.getProperties().getUnitFallSpeed() / updatesPerSecond)));
-
-        if (unit.getMines() > 0) {
-            Set<Unit> unitsInMineRadius = getUnitsInMineRadius();
-            double damageToMy = 0.0;
-            double damageToEnemy = 0.0;
-            for (Unit someUnit : unitsInMineRadius) {
-                double damage = Math.min(game.getProperties().getMineExplosionParams().getDamage(), someUnit.getHealth());
-                if (me.getId() == someUnit.getPlayerId()) {
-                    damageToMy += damage;
-                } else {
-                    damageToEnemy += damage;
-                }
-            }
-
-            if (damageToEnemy > 0) {
-                if (/*me.getScore() + damageToEnemy > enemy.getScore() || */damageToEnemy > damageToMy) {
-                    action.setPlantMine(true);
-                }
-            }
-        }
 /*
         if (unitsInMineRadius.size() > 1) {
                     && (nearGround)
@@ -184,10 +175,13 @@ public class MyStrategy implements Strategy {
         willTakeThis = null; // reset every tick
         willTakeUnitId = -1;
         LootBox nearestLauncher = null; // getNearestWeapon(WeaponType.PISTOL);
-        LootBox nearestMineBox = null; // getNearestMineBox();
+        LootBox nearestMineBox = getNearestMineBox();
         LootBox nearestHealthPack = getNearestHealthPack();
         Vec2Double runningPos = unit.getPosition();
-        if (unit.getWeapon() == null && nearestWeapon != null) {
+        if (unit.getHealth() < game.getProperties().getUnitMaxHealth() * HEALTH_TO_LOOK_FOR_HEAL && nearestHealthPack != null) {
+            runningPos = nearestHealthPack.getPosition();
+            type = DistanceMap.TargetType.HEALTH;
+        } else if (unit.getWeapon() == null && nearestWeapon != null) {
             willTakeThis = nearestWeapon;
             willTakeUnitId = unit.getId();
             debug.draw(new CustomData.Rect(nearestWeapon.getPosition().toFloatVector(), new Vec2Float(1f, 1f), new ColorFloat(0.5f, 1f, 0f, 0.2f)));
@@ -196,11 +190,9 @@ public class MyStrategy implements Strategy {
         } else if (unit.getWeapon() != null && unit.getWeapon().getTyp() != WeaponType.PISTOL && nearestLauncher != null) {
             runningPos = nearestLauncher.getPosition();
             action.setSwapWeapon(true);
-        } else if (nearestMineBox != null && unit.getMines() < 2) {
+        } else if (nearestMineBox != null && unit.getMines() < ((unit.getWeapon().getTyp() == WeaponType.ROCKET_LAUNCHER) ? 1 : 2)) {
             runningPos = nearestMineBox.getPosition();
-        } else if (unit.getHealth() < game.getProperties().getUnitMaxHealth() * HEALTH_TO_LOOK_FOR_HEAL && nearestHealthPack != null) {
-            runningPos = nearestHealthPack.getPosition();
-            type = DistanceMap.TargetType.HEALTH;
+            type = DistanceMap.TargetType.MINE;
         } else if (nearestEnemy != null) {
             runningPos = nearestEnemy.getPosition();
         }
@@ -279,6 +271,35 @@ public class MyStrategy implements Strategy {
             System.out.println("" + game.getCurrentTick() + ":" + unit.getId() + ":" + action + ":" + unit.getWeapon());
         }
 
+        Tile tileUnderMe = getTile(unit.getPosition().getX(), unit.getPosition().getY() - 1);
+        boolean nearGround = unit.isOnGround()
+                || (0 != ((int) (unit.getPosition().getY()) - (int) (unit.getPosition().getY() - 1.0 * game.getProperties().getUnitFallSpeed() / game.getProperties().getTicksPerSecond()))
+                && tileUnderMe == Tile.WALL || tileUnderMe == Tile.PLATFORM);
+        if (unit.getMines() > 0) {
+            Set<Unit> unitsInMineRadius = getUnitsInMineRadius();
+            if (unitsInMineRadius.size() > 1) {
+                double damageToMy = 0.0;
+                double damageToEnemy = 0.0;
+                for (Unit someUnit : unitsInMineRadius) {
+                    double damage = Math.min(game.getProperties().getMineExplosionParams().getDamage(), someUnit.getHealth());
+                    if (me.getId() == someUnit.getPlayerId()) {
+                        damageToMy += damage;
+                    } else {
+                        damageToEnemy += damage;
+                    }
+                }
+
+                if (damageToEnemy > 0) {
+                    if (/*me.getScore() + damageToEnemy > enemy.getScore() || */damageToEnemy >= damageToMy) {
+                        if (nearGround) {
+                            action.setPlantMine(true);
+                            action.setJumpDown(false);
+                            action.setJump(false);
+                        }
+                    }
+                }
+            }
+        }
         return action;
     }
 
@@ -305,13 +326,13 @@ public class MyStrategy implements Strategy {
     }
 
     private Set<Unit> getUnitsInMineRadius() {
-        Vec2Double position = vecUtil.add(unit.getPosition(), new Vec2Double(0, game.getProperties().getMineSize().getY() / 2.0));
+        Vec2Double minePosition = vecUtil.add(unit.getPosition(), new Vec2Double(0, game.getProperties().getMineSize().getY() / 2.0));
         Set<Unit> units = new HashSet<>();
         for (Unit other : game.getUnits()) {
             Vec2Double otherCenter = vecUtil.getCenter(other.getPosition(), other.getSize());
 
-            if (Math.abs(otherCenter.getX() - position.getX()) <= (other.getSize().getX() / 2.0 + game.getProperties().getMineExplosionParams().getRadius() - game.getProperties().getUnitMaxHorizontalSpeed())
-                    && Math.abs(otherCenter.getY() - position.getY()) <= (other.getSize().getY() / 2.0 + game.getProperties().getMineExplosionParams().getRadius()) - game.getProperties().getUnitMaxHorizontalSpeed()) {
+            if (Math.abs(otherCenter.getX() - minePosition.getX()) <= (other.getSize().getX() / 2.0 + game.getProperties().getMineExplosionParams().getRadius() - game.getProperties().getUnitMaxHorizontalSpeed() / game.getProperties().getTicksPerSecond())
+                    && Math.abs(otherCenter.getY() - minePosition.getY()) <= (other.getSize().getY() / 2.0 + game.getProperties().getMineExplosionParams().getRadius()) - game.getProperties().getUnitMaxHorizontalSpeed() / game.getProperties().getTicksPerSecond()) {
                 units.add(other);
             }
         }
@@ -351,6 +372,12 @@ public class MyStrategy implements Strategy {
     }
 
     private void neoAddon(UnitAction action, int depth) {
+        List<DummyMine> mines = new LinkedList<>();
+        for (Mine mine : game.getMines()) {
+            DummyMine dummyMine = new DummyMine(mine);
+            mines.add(dummyMine);
+        }
+
         List<DummyBullet> bullets = new LinkedList<>();
         for (Bullet bullet : game.getBullets()) {
             if (bullet.getUnitId() != unit.getId()) {
@@ -404,6 +431,29 @@ public class MyStrategy implements Strategy {
                 scores.compute(dum, (k, v) -> Math.min(finalTick / 100.0 + distanceMap.getDistanceFromTarget(k.getPosition()), v));
             }
             for (int j = 0; j < game.getProperties().getUpdatesPerTick(); j++) {
+                for (DummyMine mine : mines) {
+                    mine.tick();
+                    if (mine.state == MineState.IDLE) {
+                        for (Dummy dummy : dummies) {
+                            mine.trigger(dummy);
+                        }
+                    }
+                    if (mine.explodes() && mine.explode()) {
+                        for (Dummy dummy : dummies) {
+                            if (mine.isHittingDummyWithExplosion(dummy)) {
+                                dummy.catchExplosion(mine, game.getProperties().getMineExplosionParams().getDamage());
+                                if (survivors.contains(dummy)) {
+                                    if (lastDeadTick != tick) {
+                                        lastDead.clear();
+                                        lastDeadTick = tick;
+                                    }
+                                    lastDead.add(dummy);
+                                    survivors.remove(dummy);
+                                }
+                            }
+                        }
+                    }
+                }
                 for (Iterator<DummyBullet> iterator = bullets.iterator(); iterator.hasNext(); ) {
                     DummyBullet bullet = iterator.next();
                     bullet.moveOneUpdateHorizontally();
@@ -489,7 +539,7 @@ public class MyStrategy implements Strategy {
     private int checkOneBulletCollision(Set<Dummy> lastDead, int lastDeadTick, Set<Dummy> survivors, int tick, DummyBullet bullet, Dummy dummy) {
         if (bullet.isHittingTheDummy(dummy)) {
             dummy.catchBullet(bullet);
-            if (dummy.bulletCount() == 1) {
+            if (survivors.contains(dummy)) {
                 if (lastDeadTick != tick) {
                     lastDead.clear();
                     lastDeadTick = tick;
@@ -505,8 +555,8 @@ public class MyStrategy implements Strategy {
         if (bullet.getExplosionRadius() > 0.0) {
             for (Dummy dummy : dummies) {
                 if (bullet.isHittingTheDummyWithExplosion(dummy)) {
-                    dummy.catchBullet(bullet);
-                    if (dummy.bulletCount() == 1) {
+                    dummy.catchExplosion(bullet, bullet.getExplosionDamage());
+                    if (survivors.contains(dummy)) {
                         if (lastDeadTick != tick) {
                             lastDead.clear();
                             lastDeadTick = tick;
@@ -976,6 +1026,75 @@ public class MyStrategy implements Strategy {
         }
     }
 
+    class DummyMine {
+        private Vec2Double position;
+        private double timer;
+        private model.MineState state;
+        private Mine mine;
+
+        public DummyMine(Mine mine) {
+            position = mine.getPosition();
+            Double timer = mine.getTimer();
+            this.timer = timer == null ? -1.0 : timer;
+            state = mine.getState();
+            this.mine = mine;
+        }
+
+        public Vec2Double getPosition() {
+            return position;
+        }
+
+        public double getTimer() {
+            return timer;
+        }
+
+        public model.MineState getState() {
+            return state;
+        }
+
+        public void tick() {
+            if (timer >= 0.0) {
+                timer = timer - 1.0 / updatesPerSecond;
+                if (state == MineState.PREPARING && timer <= EPSILON) {
+                    state = MineState.IDLE;
+                }
+//                if (state == MineState.TRIGGERED && timer <= 0.0) {
+//                    // explode
+//                }
+            }
+        }
+
+        public boolean explode() {
+            if (state != MineState.EXPLODED) {
+                state = MineState.EXPLODED;
+                return true;
+            }
+            return false;
+        }
+
+        public void trigger(Dummy dummy) {
+            if (state == MineState.IDLE) {
+                double x = dummy.getPosition().getX();
+                double y = dummy.getPosition().getY() + halfUnitSizeY;
+
+                if (Math.abs(x - position.getX()) <= (halfUnitSizeX + mine.getTriggerRadius())
+                        && Math.abs(y - position.getY()) <= (halfUnitSizeY + mine.getTriggerRadius())) {
+                    state = MineState.TRIGGERED;
+                    timer = game.getProperties().getMineTriggerTime();
+                }
+            }
+        }
+
+        public boolean isHittingDummyWithExplosion(Dummy dummy) {
+            return (Math.abs(dummy.getPosition().getX() - position.getX()) <= (halfUnitSizeX + mine.getExplosionParams().getRadius())
+                    && Math.abs(dummy.getPosition().getY() + halfUnitSizeY - position.getY()) <= (halfUnitSizeY + mine.getExplosionParams().getRadius()));
+        }
+
+        public boolean explodes() {
+            return state == MineState.TRIGGERED && timer <= EPSILON;
+        }
+    }
+
     class DummyBullet {
         private Vec2Double velocity;
         private Vec2Double position;
@@ -985,19 +1104,22 @@ public class MyStrategy implements Strategy {
         private int unitId;
         private boolean trace;
         private Vec2Double startPosition;
-
+        private int damage;
+        private int explosionDamage = 0;
 
         public DummyBullet(Bullet bullet) {
             this(bullet, false);
         }
 
         public DummyBullet(Bullet bullet, boolean increaseSize) {
+            this.damage = bullet.getDamage();
             this.position = vecUtil.clone(bullet.getPosition());
             this.velocity = vecUtil.clone(bullet.getVelocity());
             this.size = increaseSize ? bullet.getSize() + 0.005 : bullet.getSize();
             this.radius = this.size / 2.0;
             if (bullet.getExplosionParams() != null) {
                 this.explosionRadius = increaseSize ? bullet.getExplosionParams().getRadius() + 0.05 : bullet.getExplosionParams().getRadius();
+                this.explosionDamage = bullet.getExplosionParams().getDamage();
             }
             this.unitId = bullet.getUnitId();
 
@@ -1006,6 +1128,7 @@ public class MyStrategy implements Strategy {
         }
 
         public DummyBullet(BulletParams bulletParams, ExplosionParams explosion, Vec2Double position, Vec2Double direction, int unitId) {
+            this.damage = bulletParams.getDamage();
             this.position = vecUtil.clone(position);
             this.unitId = unitId;
             this.velocity = vecUtil.normalize(direction, bulletParams.getSpeed());
@@ -1013,7 +1136,16 @@ public class MyStrategy implements Strategy {
             this.radius = this.size / 2.0;
             if (explosion != null) {
                 this.explosionRadius = explosion.getRadius();
+                this.explosionDamage = explosion.getDamage();
             }
+        }
+
+        public int getExplosionDamage() {
+            return explosionDamage;
+        }
+
+        public int getDamage() {
+            return damage;
         }
 
         public double getExplosionRadius() {
@@ -1073,15 +1205,15 @@ public class MyStrategy implements Strategy {
         }
 
         public boolean isHittingTheDummyWithExplosion(Dummy dummy) {
-            Vec2Double dummyCenter = vecUtil.getCenter(dummy.getPosition(), dummy.unit.getSize());
-
-            return Math.abs(dummyCenter.getX() - position.getX()) <= (dummy.unit.getSize().getX() / 2.0 + explosionRadius)
-                    && Math.abs(dummyCenter.getY() - position.getY()) <= (dummy.unit.getSize().getY() / 2.0 + explosionRadius);
+            return Math.abs(dummy.getPosition().getX() - position.getX()) <= (halfUnitSizeX + explosionRadius)
+                    && Math.abs(dummy.getPosition().getY() + halfUnitSizeY - position.getY()) <= (halfUnitSizeY + explosionRadius);
         }
     }
 
     class Dummy {
-        Set<DummyBullet> bulletsCaught = new HashSet<>();
+        Set<Object> bulletsCaught = new HashSet<>();
+        Set<Object> explosionsCaught = new HashSet<>();
+        private double damage = 0.0;
         private Vec2Double position;
         private Unit unit;
         private double canJumpForSeconds;
@@ -1133,7 +1265,17 @@ public class MyStrategy implements Strategy {
         }
 
         void catchBullet(DummyBullet bullet) {
-            bulletsCaught.add(bullet);
+            if (!bulletsCaught.contains(bullet)) {
+                bulletsCaught.add(bullet);
+                damage += bullet.getDamage();
+            }
+        }
+
+        void catchExplosion(Object from, int damage) {
+            if (!explosionsCaught.contains(from)) {
+                this.explosionsCaught.add(from);
+                this.damage += damage;
+            }
         }
 
         int bulletCount() {
@@ -1216,7 +1358,7 @@ public class MyStrategy implements Strategy {
             }
 
             if (debug.isEnabledDraw() && microTick == 0 && vecUtil.length(vecUtil.substract(position, oldPosition)) > EPSILON) {
-//                debug.draw(new CustomData.Line(oldPosition.toFloatVector(), position.toFloatVector(), 0.05f, new ColorFloat(bulletsCaught.size() / 2.0f, 0, 1, 1)));
+                debug.draw(new CustomData.Line(oldPosition.toFloatVector(), position.toFloatVector(), 0.05f, new ColorFloat(bulletsCaught.size() / 2.0f, 0, 1, 1)));
             }
         }
 
