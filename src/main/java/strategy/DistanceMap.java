@@ -1,3 +1,5 @@
+package strategy;
+
 import model.*;
 
 import java.util.ArrayList;

@@ -1,3 +1,5 @@
+package strategy;
+
 import model.*;
 import util.Debug;
 
@@ -15,7 +17,6 @@ public class FlatWorldStrategy {
     private Set<Unit> myUnits = new HashSet<>();
     private Set<Unit> enemyUnits = new HashSet<>();
     private HashMap<Integer, Unit> myUnitsById = new HashMap<>();
-    private HashMap<Integer, Order> ordersById = new HashMap<>();
 
 
     public void UpdateTick(PlayerView playerView, Debug debug) {
@@ -32,7 +33,7 @@ public class FlatWorldStrategy {
 
         myUnits.clear();
         enemyUnits.clear();
-        for (model.Unit unit : playerView.getGame().getUnits()) {
+        for (Unit unit : playerView.getGame().getUnits()) {
             if (unit.getPlayerId() == playerView.getMyId()) {
                 myUnits.add(unit);
             } else {
@@ -52,10 +53,6 @@ public class FlatWorldStrategy {
 
     public HashMap<Integer, Unit> getMyUnitsById() {
         return myUnitsById;
-    }
-
-    public HashMap<Integer, Order> getOrdersById() {
-        return ordersById;
     }
 
     public Player getMe() {

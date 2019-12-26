@@ -1,4 +1,6 @@
 import model.*;
+import strategy.DistanceMap;
+import strategy.FlatWorldStrategy;
 import util.Debug;
 import util.Strategy;
 import util.VectorUtils;
@@ -214,7 +216,9 @@ public class MyStrategy implements Strategy {
         setJumpAndVelocity(runningPos, action);
 
         if (unit.getWeapon() != null) {
-            aim = vecUtil.add(vecUtil.normalize(aim, 10), vecUtil.fromAngle(unit.getWeapon().getLastAngle(), 5)); // smooth hack
+            if (unit.getWeapon().getLastAngle() != null) {
+                aim = vecUtil.normalize(vecUtil.add(vecUtil.normalize(aim, 10), vecUtil.fromAngle(unit.getWeapon().getLastAngle(), 5)), 10); // smooth hack
+            }
 
             double spread = unit.getWeapon().getSpread();
             if (unit.getWeapon().getLastAngle() != null) {
@@ -271,6 +275,11 @@ public class MyStrategy implements Strategy {
             System.out.println("" + game.getCurrentTick() + ":" + unit.getId() + ":" + action + ":" + unit.getWeapon());
         }
 
+        dickMove(unit, game, action);
+        return action;
+    }
+
+    private void dickMove(Unit unit, Game game, UnitAction action) {
         Tile tileUnderMe = getTile(unit.getPosition().getX(), unit.getPosition().getY() - 1);
         boolean nearGround = unit.isOnGround()
                 || (0 != ((int) (unit.getPosition().getY()) - (int) (unit.getPosition().getY() - 1.0 * game.getProperties().getUnitFallSpeed() / game.getProperties().getTicksPerSecond()))
@@ -318,18 +327,19 @@ public class MyStrategy implements Strategy {
             }
             if (closestDistance < 2) {
                 double ticks = (unit.getWeapon().getFireTimer() == null ? 0.0 : unit.getWeapon().getFireTimer() * game.getProperties().getTicksPerSecond())
-                        +
+                        + 1 +
                         (closestDistance - (unit.getWeapon().getParams().getBullet().getSize() + game.getProperties().getMineSize().getX()) / 2.0)
                                 / unit.getWeapon().getParams().getBullet().getSpeed();
 
-                // explosian after ticks
+                // explosion after ticks
+
+//                damageToMy
                 System.out.println(ticks);
-                action.setAim(vecUtil.normalize(vecUtil.substract(closest.getPosition(), unit.getPosition()), 10.0));
+                action.setAim(vecUtil.normalize(vecUtil.substract(closest.getPosition(), myCenter), 10.0));
                 action.setShoot(true); // check kill
             }
 
         }
-        return action;
     }
 
     private boolean isJumppadNearby(int x, int y) {
