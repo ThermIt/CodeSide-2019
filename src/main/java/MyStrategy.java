@@ -5,8 +5,6 @@ import util.Debug;
 import util.Strategy;
 import util.VectorUtils;
 
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.*;
 
 public class MyStrategy implements Strategy {
@@ -290,6 +288,9 @@ public class MyStrategy implements Strategy {
     }
 
     private void dickMove(Unit unit, Game game, UnitAction action) {
+        // учитывать аптечки в подсчёте взрыва
+        // ставить только если хватит для уничтожения
+/*
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         OffsetDateTime hHour1 = OffsetDateTime.of(2019, 12, 28, 13, 00, 00, 00, ZoneOffset.ofHours(3));
         OffsetDateTime hHour2 = OffsetDateTime.of(2019, 12, 29, 11, 00, 00, 00, ZoneOffset.ofHours(3));
@@ -301,6 +302,7 @@ public class MyStrategy implements Strategy {
                 System.out.println(new Date());
             }
         }
+*/
         Tile tileUnderMe = getTile(unit.getPosition().getX(), unit.getPosition().getY() - 1);
         boolean nearGround = unit.isOnGround()
                 || (0 != ((int) (unit.getPosition().getY()) - (int) (unit.getPosition().getY() - 1.0 * game.getProperties().getUnitFallSpeed() / game.getProperties().getTicksPerSecond()))
