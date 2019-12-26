@@ -186,7 +186,9 @@ public class MyStrategy implements Strategy {
         } else if (unit.getWeapon() == null && nearestWeapon != null) {
             willTakeThis = nearestWeapon;
             willTakeUnitId = unit.getId();
-            debug.draw(new CustomData.Rect(nearestWeapon.getPosition().toFloatVector(), new Vec2Float(1f, 1f), new ColorFloat(0.5f, 1f, 0f, 0.2f)));
+            if (debug.isEnabledDraw()) {
+                debug.draw(new CustomData.Rect(nearestWeapon.getPosition().toFloatVector(), new Vec2Float(1f, 1f), new ColorFloat(0.5f, 1f, 0f, 0.2f)));
+            }
 
             runningPos = nearestWeapon.getPosition();
         } else if (unit.getWeapon() != null && unit.getWeapon().getTyp() != WeaponType.PISTOL && nearestLauncher != null) {
@@ -231,19 +233,25 @@ public class MyStrategy implements Strategy {
             }
             if (hitPNew.getEnemyHitProbability() - hitPOld.getEnemyHitProbability() >= 0.02 || unit.getWeapon() == null || unit.getWeapon().getLastAngle() == null) {
                 action.setAim(vecUtil.normalize(aim, 10.0));
-                debug.draw(new CustomData.Rect(unit.getPosition().toFloatVector(), new Vec2Float(0.3f, 0.3f), new ColorFloat(1f, 0f, 0f, 1f)));
-                debug.draw(new CustomData.Rect(vecUtil.add(unit.getPosition(), vecUtil.normalize(aim, 10.0)).toFloatVector(), new Vec2Float(0.3f, 0.3f), new ColorFloat(1f, 0f, 0f, 1f)));
+                if (debug.isEnabledDraw()) {
+                    debug.draw(new CustomData.Rect(unit.getPosition().toFloatVector(), new Vec2Float(0.3f, 0.3f), new ColorFloat(1f, 0f, 0f, 1f)));
+                    debug.draw(new CustomData.Rect(vecUtil.add(unit.getPosition(), vecUtil.normalize(aim, 10.0)).toFloatVector(), new Vec2Float(0.3f, 0.3f), new ColorFloat(1f, 0f, 0f, 1f)));
+                }
             } else {
                 hitPNew = hitPOld;
                 Vec2Double lastAim = vecUtil.fromAngle(unit.getWeapon().getLastAngle(), 10.0);
                 if (vecUtil.angleBetween(aim, lastAim) < Math.PI / 4.0) {
                     action.setAim(lastAim);
-                    debug.draw(new CustomData.Rect(unit.getPosition().toFloatVector(), new Vec2Float(0.3f, 0.3f), new ColorFloat(0f, 1f, 0f, 1f)));
-                    debug.draw(new CustomData.Rect(vecUtil.add(unit.getPosition(), lastAim).toFloatVector(), new Vec2Float(0.3f, 0.3f), new ColorFloat(0f, 1f, 0f, 1f)));
+                    if (debug.isEnabledDraw()) {
+                        debug.draw(new CustomData.Rect(unit.getPosition().toFloatVector(), new Vec2Float(0.3f, 0.3f), new ColorFloat(0f, 1f, 0f, 1f)));
+                        debug.draw(new CustomData.Rect(vecUtil.add(unit.getPosition(), lastAim).toFloatVector(), new Vec2Float(0.3f, 0.3f), new ColorFloat(0f, 1f, 0f, 1f)));
+                    }
                 } else {
                     action.setAim(vecUtil.normalize(aim, 10.0));
-                    debug.draw(new CustomData.Rect(unit.getPosition().toFloatVector(), new Vec2Float(0.3f, 0.3f), new ColorFloat(0f, 0f, 1f, 1f)));
-                    debug.draw(new CustomData.Rect(vecUtil.add(unit.getPosition(), vecUtil.normalize(aim, 10.0)).toFloatVector(), new Vec2Float(0.3f, 0.3f), new ColorFloat(0f, 0f, 1f, 1f)));
+                    if (debug.isEnabledDraw()) {
+                        debug.draw(new CustomData.Rect(unit.getPosition().toFloatVector(), new Vec2Float(0.3f, 0.3f), new ColorFloat(0f, 0f, 1f, 1f)));
+                        debug.draw(new CustomData.Rect(vecUtil.add(unit.getPosition(), vecUtil.normalize(aim, 10.0)).toFloatVector(), new Vec2Float(0.3f, 0.3f), new ColorFloat(0f, 0f, 1f, 1f)));
+                    }
                 }
             }
             if (unit.getWeapon().getTyp() == WeaponType.ROCKET_LAUNCHER) {
@@ -334,11 +342,12 @@ public class MyStrategy implements Strategy {
                 // explosion after ticks
 
 //                damageToMy
-                System.out.println(ticks);
+                if (debug.isEnabledOutput()) {
+                    System.out.println(ticks);
+                }
                 action.setAim(vecUtil.normalize(vecUtil.substract(closest.getPosition(), myCenter), 10.0));
                 action.setShoot(true); // check kill
             }
-
         }
     }
 
