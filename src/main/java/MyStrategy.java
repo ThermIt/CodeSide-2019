@@ -441,9 +441,11 @@ damageToEnemy >= damageToMy) {
             }
         }
 
-        System.out.println(game.getCurrentTick() + " " + unit.getWeapon().getTyp());
-        System.out.println(damagedEnemies + " " + damagedAllies + " " + score + " " + remainingAllies + " " + remainingEnemies + " " + remainingAlliesHealth + " " + remainingEnemiesHealth);
-        System.out.println("" + (damagedEnemies > 0) + " " + (damagedEnemies >= damagedAllies) + " " + (score > 0) + " " + (remainingAllies >= remainingEnemies) + " " + (remainingAlliesHealth >= remainingEnemiesHealth));
+        if (debug.isEnabledOutput()) {
+            System.out.println(game.getCurrentTick() + " " + unit.getWeapon().getTyp());
+            System.out.println(damagedEnemies + " " + damagedAllies + " " + score + " " + remainingAllies + " " + remainingEnemies + " " + remainingAlliesHealth + " " + remainingEnemiesHealth);
+            System.out.println("" + (damagedEnemies > 0) + " " + (damagedEnemies >= damagedAllies) + " " + (score > 0) + " " + (remainingAllies >= remainingEnemies) + " " + (remainingAlliesHealth >= remainingEnemiesHealth));
+        }
         return (damagedEnemies > 0 && damagedEnemies >= damagedAllies && score > 0 && remainingAllies >= remainingEnemies && remainingAlliesHealth >= remainingEnemiesHealth)
                 || (remainingEnemies == 0 && score > 0);
     }
