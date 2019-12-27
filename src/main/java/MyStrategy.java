@@ -261,7 +261,7 @@ public class MyStrategy implements Strategy {
                     closestDistance = currentDistance;
                 }
             }
-            if (closestDistance < 2) {
+            if (closestDistance < 3) {
                 double ticks = (unit.getWeapon().getFireTimer() == null ? 0.0 : unit.getWeapon().getFireTimer() * game.getProperties().getTicksPerSecond())
                         + 1 +
                         (closestDistance - (unit.getWeapon().getParams().getBullet().getSize() + game.getProperties().getMineSize().getX()) / 2.0)
@@ -322,13 +322,14 @@ public class MyStrategy implements Strategy {
                         }
                     }
                 }
+                boolean okToEngage = killedEnemies > 0 && score > 0 && remainingAllies >= remainingEnemies && remainingAlliesHealth >= remainingEnemiesHealth;
 
 
 //                damageToMy
                 if (debug.isEnabledOutput()) {
                     System.out.println(ticks);
                 }
-                if (killedEnemies > 0 && score > 0 && remainingAllies >= remainingEnemies && remainingAlliesHealth >= remainingEnemiesHealth) {
+                if (okToEngage) {
                     action.setAim(vecUtil.normalize(vecUtil.substract(closest.getPosition(), myCenter), 10.0));
                     action.setShoot(true); // check kill
                 }
@@ -463,26 +464,30 @@ public class MyStrategy implements Strategy {
                     }
                 }
 
-                for (Dummy dumdum : allDummies) {
-                    if (dumdum.unit.getPlayerId() == strat.getEnemy().getId() && dumdum.unit.getMines() > 0) {
-                        double x = dumdum.getPosition().getX();
-                        double y = dumdum.getPosition().getY() + game.getProperties().getMineSize().getX() / 2.0;
-                        DummyMine mine = new DummyMine(x, y);
-                        for (Dummy dummy : dummies) {
-                            if (mine.isHittingDummyWithExplosion(dummy)) {
-                                dummy.catchExplosion(mine, dumdum.unit.getMines() * 10);
-                                if (survivors.contains(dummy)) {
-                                    if (lastDeadTick != tick) {
-                                        lastDead.clear();
-                                        lastDeadTick = tick;
+/*
+                if (unit.getWeapon() != null) {
+                    for (Dummy dumdum : allDummies) {
+                        if (dumdum.unit.getPlayerId() == strat.getEnemy().getId() && (dumdum.unit.getMines() > 1 || (dumdum.unit.getMines() == 1 && dumdum.unit.getWeapon() != null && dumdum.unit.getWeapon().getTyp() == WeaponType.ROCKET_LAUNCHER))) {
+                            double x = dumdum.getPosition().getX();
+                            double y = dumdum.getPosition().getY() + game.getProperties().getMineSize().getX() / 2.0;
+                            DummyMine mine = new DummyMine(x, y);
+                            for (Dummy dummy : dummies) {
+                                if (mine.isHittingDummyWithExplosion(dummy)) {
+                                    dummy.catchExplosion(dumdum, 10);
+                                    if (survivors.contains(dummy)) {
+                                        if (lastDeadTick != tick) {
+                                            lastDead.clear();
+                                            lastDeadTick = tick;
+                                        }
+                                        lastDead.add(dummy);
+                                        survivors.remove(dummy);
                                     }
-                                    lastDead.add(dummy);
-                                    survivors.remove(dummy);
                                 }
                             }
                         }
                     }
                 }
+*/
 
                 for (Iterator<DummyBullet> iterator = bullets.iterator(); iterator.hasNext(); ) {
                     DummyBullet bullet = iterator.next();
@@ -1377,7 +1382,7 @@ public class MyStrategy implements Strategy {
             }
 
             if (debug.isEnabledDraw() && microTick == 0 && vecUtil.length(vecUtil.substract(position, oldPosition)) > EPSILON) {
-                debug.draw(new CustomData.Line(oldPosition.toFloatVector(), position.toFloatVector(), 0.05f, new ColorFloat((float)damage / 50.0f, 0, 1, 1)));
+                debug.draw(new CustomData.Line(oldPosition.toFloatVector(), position.toFloatVector(), 0.05f, new ColorFloat((float) damage / 50.0f, 0, 1, 1)));
             }
         }
 
