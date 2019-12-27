@@ -5,12 +5,15 @@ import model.*;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 public class DistanceMap {
     public static final int SCALE = 3;
     private int[][] distanceMap;
     private int[][] distanceMapFromTarget;
+    private int[][] distanceMapFromEnemies;
+    private int enemyTick = -1;
     private int[][] distanceMapFromHealth;
     private int healthCount = -1;
     private int[][] distanceMapFromMine;
@@ -45,6 +48,10 @@ public class DistanceMap {
             case MINE:
                 updateMineMap(game);
                 distanceMapFromTarget = distanceMapFromMine;
+                break;
+            case ENEMY:
+                updateEnemyMap(game);
+                distanceMapFromTarget = distanceMapFromEnemies;
                 break;
             case EMPTY:
             default:
@@ -104,6 +111,17 @@ public class DistanceMap {
         }
     }
 
+    private void updateEnemyMap(Game game) {
+        Set<Unit> enemies = strat.getEnemyUnits();
+        int tick = game.getCurrentTick();
+        if (tick != enemyTick) {
+            distanceMapFromEnemies = new int[sizeX][sizeY];
+            List<Coordinate> coordinates = enemies.stream().map(box -> new Coordinate(box.getPosition())).collect(Collectors.toList());
+            fillDistances(distanceMapFromEnemies, coordinates);
+            enemyTick = tick;
+        }
+    }
+
     private void updateMineMap(Game game) {
         List<LootBox> healthBoxes = Arrays.stream(game.getLootBoxes()).filter(box -> box.getItem() instanceof Item.Mine).collect(Collectors.toList());
         int count = healthBoxes.size();
@@ -118,7 +136,8 @@ public class DistanceMap {
     public enum TargetType {
         EMPTY,
         MINE,
-        HEALTH
+        HEALTH,
+        ENEMY
     }
 
     private class Coordinate {

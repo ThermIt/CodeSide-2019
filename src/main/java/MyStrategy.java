@@ -57,6 +57,7 @@ public class MyStrategy implements Strategy {
     private Player enemy;
     private FlatWorldStrategy strat = new FlatWorldStrategy();
     private DistanceMap distanceMap;
+    private boolean inverted;
 
     @Override
     public Map<Integer, UnitAction> getAllActions(PlayerView playerView, Debug debug) {
@@ -172,6 +173,7 @@ public class MyStrategy implements Strategy {
         }
 */
 
+        inverted = false;
         DistanceMap.TargetType type = DistanceMap.TargetType.EMPTY;
         LootBox nearestWeapon = getNearestWeapon(null);
         willTakeThis = null; // reset every tick
@@ -199,6 +201,7 @@ public class MyStrategy implements Strategy {
             type = DistanceMap.TargetType.MINE;
         } else if (nearestEnemy != null) {
             runningPos = nearestEnemy.getPosition();
+            type = DistanceMap.TargetType.ENEMY;
         }
         Vec2Double aim = new Vec2Double(0, 0);
         if (nearestEnemy != null) {
@@ -561,7 +564,7 @@ public class MyStrategy implements Strategy {
 //            dummies = new HashSet<>(survivors); // hack optimization
             for (Dummy dum : dummies) {
                 int finalTick = tick;
-                scores.compute(dum, (k, v) -> Math.min(finalTick / 100.0 + distanceMap.getDistanceFromTarget(k.getPosition()), v));
+                scores.compute(dum, (k, v) -> Math.min(finalTick / 100.0 + (inverted?-1:1) * distanceMap.getDistanceFromTarget(k.getPosition()), v));
             }
             for (int j = 0; j < game.getProperties().getUpdatesPerTick(); j++) {
                 for (DummyMine mine : mines) {
